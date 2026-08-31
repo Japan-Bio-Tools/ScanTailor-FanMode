@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+X-ScanTailor-FanMode-Version=@VERSION@
+Name=ScanTailor FanMode
+GenericName=Scan Processing Tool
+Exec=scantailor-fanmode %f
+Icon=scantailor-fanmode
+Terminal=false
+Categories=Graphics;Scanning;
+MimeType=application/x-scantailor-project;

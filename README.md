@@ -1,7 +1,15 @@
-# ScanTailor Advanced
+# ScanTailor FanMode
 
-The ScanTailor version that merges the features of the `ScanTailor Featured` and `ScanTailor Enhanced` versions,
-brings new ones and fixes.  
+ScanTailor FanMode is a local desktop application for scanned-book post-processing. It is based on the maintained
+ScanTailor Advanced engine and will add a focused, simple workflow informed by the ScanFan prototype.
+
+The initial FanMode baseline intentionally preserves ScanTailor Advanced's processing behavior and `.ScanTailor`
+project compatibility. FanMode-specific features will be introduced incrementally on the `fanmode` branch.
+
+See [FANMODE.md](FANMODE.md) for source provenance, versioning, and the upstream synchronization policy.
+
+The inherited ScanTailor Advanced engine merges features from `ScanTailor Featured` and `ScanTailor Enhanced`,
+adds new capabilities, and fixes defects.
 
 ### Video demonstration of an older version
 [![image](https://github.com/ScanTailor-Advanced/scantailor-advanced/assets/6695517/d0e1dbbe-0e97-4d72-a011-28b171cad939)](https://vimeo.com/12524529) 
@@ -491,7 +499,7 @@ Then from the ScanTailor Advanced source directory:
 ./build-windows.sh
 ```
 
-This produces `build-win-static/scantailor.exe`. Use `./build-windows.sh shared` for a smaller build that requires shipping DLLs from MXE’s `usr/x86_64-w64-mingw32.shared/bin/` alongside the .exe.
+This produces `build-win-static/scantailor-fanmode.exe`. Use `./build-windows.sh shared` for a smaller build that requires shipping DLLs from MXE’s `usr/x86_64-w64-mingw32.shared/bin/` alongside the .exe.
 
 #### Building on Windows (native)
 

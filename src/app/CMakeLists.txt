@@ -1,7 +1,7 @@
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-set(target_name scantailor-advanced)
+set(target_name scantailor-fanmode)
 
 set(resource_files
     resources.qrc

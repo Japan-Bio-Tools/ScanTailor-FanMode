@@ -40,7 +40,7 @@ ARCH=$(dpkg --print-architecture 2>/dev/null || echo "amd64")
 # Generate Depends via dpkg-shlibdeps when available (more accurate)
 DEPS=""
 if command -v dpkg-shlibdeps >/dev/null 2>&1; then
-  SHLIBS_OUT=$(cd "${PKG_DIR}" && dpkg-shlibdeps -e usr/bin/scantailor-advanced -O 2>/dev/null || true)
+  SHLIBS_OUT=$(cd "${PKG_DIR}" && dpkg-shlibdeps -e usr/bin/scantailor-fanmode -O 2>/dev/null || true)
   if [[ -n "$SHLIBS_OUT" ]]; then
     DEPS="${SHLIBS_OUT#shlibs:Depends=}"
   fi
@@ -52,7 +52,7 @@ if [[ -z "$DEPS" ]]; then
 fi
 
 cat > "${DEBIAN_DIR}/control" << EOF
-Package: scantailor-advanced
+Package: scantailor-fanmode
 Version: ${VERSION}
 Section: graphics
 Priority: optional
@@ -86,6 +86,6 @@ chmod 755 "${DEBIAN_DIR}/postinst"
 
 # Build the .deb
 cd "$SCRIPT_DIR"
-dpkg-deb --root-owner-group --build "$PKG_DIR" "scantailor-advanced_${VERSION}_${ARCH}.deb"
+dpkg-deb --root-owner-group --build "$PKG_DIR" "scantailor-fanmode_${VERSION}_${ARCH}.deb"
 
-echo "Done: scantailor-advanced_${VERSION}_${ARCH}.deb"
+echo "Done: scantailor-fanmode_${VERSION}_${ARCH}.deb"

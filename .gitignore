@@ -124,6 +124,7 @@ coverage/
 lcov.info
 
 # Packaging / distribution artifacts
+artifacts/
 *.tar
 *.tar.gz
 *.zip

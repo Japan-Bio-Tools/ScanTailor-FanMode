@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.9 FATAL_ERROR)
 
-set(target_name scantailor-advanced)
+set(target_name scantailor-fanmode)
 
 # Disable in-source builds.
 if ("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
@@ -14,7 +14,7 @@ if (POLICY CMP0071)
   cmake_policy(SET CMP0071 NEW)
 endif()
 
-project("ScanTailor Advanced")
+project("ScanTailor FanMode")
 
 # Set compiler flags.
 set(CMAKE_CXX_STANDARD 17)
@@ -340,7 +340,7 @@ configure_file(
 add_subdirectory(src)
 
 # Translations
-file(GLOB translation_files "${SCANTAILOR_TRANSLATIONS_DIR}/${target_name}_*.ts")
+file(GLOB translation_files "${SCANTAILOR_TRANSLATIONS_DIR}/scantailor-advanced_*.ts")
 
 finalize_translations(scantailor ${translation_files})
 update_translations_target(update_translations scantailor)
@@ -454,7 +454,7 @@ if (WIN32)
   copy_to_build_dir(${ADDITIONAL_RUNTIME_LIBS_DEBUG} CONFIGURATIONS Debug)
 
   # Generate the target that will actually do the copying.
-  generate_copy_to_build_dir_target(copy_to_build_dir)
+  generate_copy_to_build_dir_target(copy_to_build_dir ${target_name})
 
   install(PROGRAMS ${ADDITIONAL_RUNTIME_LIBS_RELEASE} TYPE BIN CONFIGURATIONS Release MinSizeRel RelWithDebInfo)
   install(PROGRAMS ${ADDITIONAL_RUNTIME_LIBS_DEBUG} TYPE BIN CONFIGURATIONS Debug)
@@ -477,11 +477,11 @@ set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION "${CMAKE_INSTALL_BINDIR}")
 include(InstallRequiredSystemLibraries)
 
 # Packaging
-set(CPACK_PACKAGE_NAME "${APPLICATION_NAME}")
+set(CPACK_PACKAGE_NAME "scantailor-fanmode")
 set(CPACK_PACKAGE_VERSION_MAJOR "${APPLICATION_VERSION_MAJOR}")
 set(CPACK_PACKAGE_VERSION_MINOR "${APPLICATION_VERSION_MINOR}")
 set(CPACK_PACKAGE_VERSION_PATCH "${APPLICATION_VERSION_PATCH}")
-set(CPACK_PACKAGE_VENDOR "4lex4 <4lex49@zoho.com>")
+set(CPACK_PACKAGE_VENDOR "ScanTailor FanMode contributors")
 set(CPACK_PACKAGE_CONTACT "${CPACK_PACKAGE_VENDOR}")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Interactive post-processing tool for scanned pages.")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE")
