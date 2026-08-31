@@ -3,10 +3,18 @@
 
 #include "OrderByCompletenessProvider.h"
 
-bool OrderByCompletenessProvider::precedes(const PageId&, bool lhsIncomplete, const PageId&, bool rhsIncomplete) const {
+#include <utility>
+
+OrderByCompletenessProvider::OrderByCompletenessProvider(std::shared_ptr<const PageOrderProvider> fallback)
+    : m_fallback(std::move(fallback)) {}
+
+bool OrderByCompletenessProvider::precedes(const PageId& lhsPage,
+                                           const bool lhsIncomplete,
+                                           const PageId& rhsPage,
+                                           const bool rhsIncomplete) const {
   if (lhsIncomplete != rhsIncomplete) {
     // Incomplete pages go to the back.
     return rhsIncomplete;
   }
-  return true;
+  return m_fallback && m_fallback->precedes(lhsPage, lhsIncomplete, rhsPage, rhsIncomplete);
 }

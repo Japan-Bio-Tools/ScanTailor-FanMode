@@ -11,7 +11,7 @@ StageSequence::StageSequence(const std::shared_ptr<ProjectPages>& pages,
       m_pageSplitFilter(std::make_shared<page_split::Filter>(pages, pageSelectionAccessor)),
       m_deskewFilter(std::make_shared<deskew::Filter>(pageSelectionAccessor)),
       m_selectContentFilter(std::make_shared<select_content::Filter>(pageSelectionAccessor)),
-      m_outputFilter(std::make_shared<output::Filter>(pageSelectionAccessor)),
+      m_outputFilter(std::make_shared<output::Filter>(pages, pageSelectionAccessor)),
       m_pageLayoutFilter(std::make_shared<page_layout::Filter>(
           pages, pageSelectionAccessor,
           [outputFilter = std::weak_ptr<output::Filter>(m_outputFilter)]() {

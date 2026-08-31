@@ -19,6 +19,7 @@
 class PageSelectionAccessor;
 class ThumbnailPixmapCache;
 class OutputFileNameGenerator;
+class ProjectPages;
 class QString;
 
 namespace ocr {
@@ -36,7 +37,7 @@ class Filter : public AbstractFilter {
 
   Q_DECLARE_TR_FUNCTIONS(output::Filter)
  public:
-  explicit Filter(const PageSelectionAccessor& pageSelectionAccessor);
+  Filter(std::shared_ptr<ProjectPages> pages, const PageSelectionAccessor& pageSelectionAccessor);
 
   ~Filter() override;
 

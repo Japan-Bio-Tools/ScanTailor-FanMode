@@ -2,8 +2,13 @@
 // Use of this source code is governed by the GNU GPLv3 license that can be found in the LICENSE file.
 
 #include <ImageId.h>
+#include <ImageInfo.h>
+#include <ImageMetadata.h>
+#include <OrderByCompletenessProvider.h>
 #include <PageId.h>
+#include <ProjectPages.h>
 #include <filters/output/OrderByCoverProvider.h>
+#include <filters/output/OrderByNaturalProvider.h>
 #include <filters/output/Params.h>
 #include <filters/output/Settings.h>
 
@@ -56,6 +61,27 @@ BOOST_AUTO_TEST_CASE(provider_places_front_first_and_back_last) {
   const auto reversed = provider.reversed();
   BOOST_CHECK(reversed->precedes(front, false, body, false));
   BOOST_CHECK(reversed->precedes(body, false, back, false));
+}
+
+BOOST_AUTO_TEST_CASE(natural_provider_keeps_project_number_order_after_refresh) {
+  std::vector<ImageInfo> images;
+  images.emplace_back(ImageId("/book/page-1.tif"), ImageMetadata(), 1, false, false);
+  images.emplace_back(ImageId("/book/page-2.tif"), ImageMetadata(), 1, false, false);
+  images.emplace_back(ImageId("/book/page-10.tif"), ImageMetadata(), 1, false, false);
+  auto pages = std::make_shared<ProjectPages>(images, Qt::RightToLeft);
+  auto natural = std::make_shared<output::OrderByNaturalProvider>(pages);
+  const PageId page1(images[0].id());
+  const PageId page2(images[1].id());
+  const PageId page10(images[2].id());
+
+  BOOST_CHECK(natural->precedes(page1, false, page2, false));
+  BOOST_CHECK(natural->precedes(page2, false, page10, false));
+  BOOST_CHECK(!natural->precedes(page10, false, page2, false));
+
+  const OrderByCompletenessProvider completeness(natural);
+  BOOST_CHECK(completeness.precedes(page2, true, page10, true));
+  BOOST_CHECK(!completeness.precedes(page10, true, page2, true));
+  BOOST_CHECK(completeness.precedes(page10, false, page1, true));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

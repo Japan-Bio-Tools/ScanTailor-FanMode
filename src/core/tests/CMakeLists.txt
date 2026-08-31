@@ -12,6 +12,7 @@ set(sources
     TestPageRange.cpp
     TestPageSequence.cpp
     TestProjectReaderCompatibility.cpp
+    TestRtlPdfFixer.cpp
     TestSelectContentApply.cpp
     TestSmartFilenameOrdering.cpp
     TestUnits.cpp)
@@ -22,3 +23,8 @@ target_link_libraries(
     PRIVATE core dewarping Boost::unit_test_framework ${EXTRA_LIBS})
 
 add_test(NAME core_tests COMMAND core_tests --log_level=message)
+
+# Small developer utility for exercising the production RTL text-layer rewrite
+# against real Tesseract PDF / TSV pairs.
+add_executable(rtl_pdf_fixer_tool RtlPdfFixerTool.cpp)
+target_link_libraries(rtl_pdf_fixer_tool PRIVATE output Qt::Core)

@@ -4,13 +4,21 @@
 #ifndef SCANTAILOR_CORE_ORDERBYCOMPLETENESSPROVIDER_H_
 #define SCANTAILOR_CORE_ORDERBYCOMPLETENESSPROVIDER_H_
 
+#include <memory>
+
 #include "PageOrderProvider.h"
 
 class OrderByCompletenessProvider : public PageOrderProvider {
  public:
-  OrderByCompletenessProvider() = default;
+  explicit OrderByCompletenessProvider(std::shared_ptr<const PageOrderProvider> fallback = nullptr);
 
-  bool precedes(const PageId&, bool lhsIncomplete, const PageId&, bool rhsIncomplete) const override;
+  bool precedes(const PageId& lhsPage,
+                bool lhsIncomplete,
+                const PageId& rhsPage,
+                bool rhsIncomplete) const override;
+
+ private:
+  std::shared_ptr<const PageOrderProvider> m_fallback;
 };
 
 

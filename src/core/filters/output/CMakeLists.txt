@@ -14,6 +14,7 @@ set(ui_files
 set(sources
     ../ocr/Filter.cpp ../ocr/Filter.h
     ../ocr/OptionsWidget.cpp ../ocr/OptionsWidget.h
+    ../ocr/RtlPdfFixer.cpp ../ocr/RtlPdfFixer.h
     ../ocr/Settings.cpp ../ocr/Settings.h
     ../ocr/Task.cpp ../ocr/Task.h
     ApplyColorsDialog.cpp ApplyColorsDialog.h
@@ -65,6 +66,7 @@ set(sources
     PictureShapeOptions.cpp PictureShapeOptions.h 
     OutputProcessingParams.cpp OutputProcessingParams.h
     OrderByCoverProvider.cpp OrderByCoverProvider.h
+    OrderByNaturalProvider.cpp OrderByNaturalProvider.h
     OutputImage.h
     OutputImageWithForeground.h
     OutputImageWithOriginalBackground.h
@@ -73,8 +75,10 @@ set(sources
     OutputImageWithOriginalBackgroundMask.cpp OutputImageWithOriginalBackgroundMask.h
     OutputImageBuilder.cpp OutputImageBuilder.h ForegroundType.h)
 
+find_package(qpdf CONFIG REQUIRED)
+
 add_library(output STATIC ${sources} ${ui_files})
-target_link_libraries(output PUBLIC core PRIVATE dewarping)
+target_link_libraries(output PUBLIC core PRIVATE dewarping qpdf::libqpdf)
 target_include_directories(output PRIVATE "$<TARGET_PROPERTY:TIFF::TIFF,INTERFACE_INCLUDE_DIRECTORIES>")
 
 translation_sources(scantailor ${sources} ${ui_files})

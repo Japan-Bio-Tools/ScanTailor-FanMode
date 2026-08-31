@@ -11,6 +11,7 @@
 #include "FilterUiInterface.h"
 #include "OptionsWidget.h"
 #include "OrderByCoverProvider.h"
+#include "OrderByNaturalProvider.h"
 #include "ProjectReader.h"
 #include "ProjectWriter.h"
 #include "Settings.h"
@@ -19,12 +20,13 @@
 #include "Utils.h"
 
 namespace output {
-Filter::Filter(const PageSelectionAccessor& pageSelectionAccessor)
+Filter::Filter(std::shared_ptr<ProjectPages> pages, const PageSelectionAccessor& pageSelectionAccessor)
     : m_settings(std::make_shared<Settings>()), m_selectedPageOrder(0) {
   m_optionsWidget.reset(new OptionsWidget(m_settings, pageSelectionAccessor));
 
-  const auto orderByCompleteness = std::make_shared<OrderByCompletenessProvider>();
-  const auto coverOrder = std::make_shared<OrderByCoverProvider>(m_settings);
+  const auto naturalOrder = std::make_shared<OrderByNaturalProvider>(std::move(pages));
+  const auto orderByCompleteness = std::make_shared<OrderByCompletenessProvider>(naturalOrder);
+  const auto coverOrder = std::make_shared<OrderByCoverProvider>(m_settings, naturalOrder);
   const auto coverCompletenessOrder = std::make_shared<OrderByCoverProvider>(m_settings, orderByCompleteness);
   m_pageOrderOptions.emplace_back(tr("Natural order (covers first / last)"), coverOrder);
   m_pageOrderOptions.emplace_back(tr("Order by completeness (covers first / last)"), coverCompletenessOrder);

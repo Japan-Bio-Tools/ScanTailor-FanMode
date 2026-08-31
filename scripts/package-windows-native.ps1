@@ -22,6 +22,7 @@ $popplerData = Join-Path $ucrtRoot 'share\poppler'
 $popplerDataLicenses = Join-Path $ucrtRoot 'share\licenses\poppler-data'
 $tesseractLicenses = Join-Path $ucrtRoot 'share\licenses\tesseract-ocr'
 $leptonicaLicenses = Join-Path $ucrtRoot 'share\licenses\leptonica'
+$qpdfLicenses = Join-Path $ucrtRoot 'share\licenses\qpdf'
 
 if (-not (Test-Path -LiteralPath $executable)) {
     throw "Build FanMode before packaging. Missing executable: $executable"
@@ -85,6 +86,9 @@ if (Test-Path -LiteralPath $tesseractLicenses) {
 if (Test-Path -LiteralPath $leptonicaLicenses) {
     Copy-Item -LiteralPath $leptonicaLicenses -Destination $thirdPartyLicenses -Recurse
 }
+if (Test-Path -LiteralPath $qpdfLicenses) {
+    Copy-Item -LiteralPath $qpdfLicenses -Destination $thirdPartyLicenses -Recurse
+}
 
 # Copy every non-system MinGW dependency, including dependencies of plugins.
 $queue = [System.Collections.Generic.Queue[string]]::new()
@@ -124,6 +128,7 @@ $buildInfo = @(
     'Architecture: x64'
     'PDF import: Poppler pdftoppm with lossless LZW TIFF output'
     'Searchable PDF export: Tesseract OCR with bundled Arabic and English data'
+    'RTL PDF correction: QPDF with logical-order Arabic and bilingual text layers'
     'License: GNU GPL version 3 (see LICENSE.txt)'
 )
 $buildInfo | Set-Content -LiteralPath (Join-Path $resolvedPackage 'BUILD-INFO.txt') -Encoding UTF8

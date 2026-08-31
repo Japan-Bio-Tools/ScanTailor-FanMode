@@ -22,6 +22,7 @@
 #include "AbstractRelinker.h"
 #include "PageSequence.h"
 #include "ProjectPages.h"
+#include "RtlPdfFixer.h"
 #include "Settings.h"
 #include "filters/output/Filter.h"
 
@@ -319,7 +320,8 @@ void OptionsWidget::exportPdf() {
                         QStringLiteral("jpg_quality=%1").arg(m_settings->jpegQuality()),
                         QStringLiteral("-c"),
                         QStringLiteral("preserve_interword_spaces=1"),
-                        QStringLiteral("pdf")});
+                        QStringLiteral("pdf"),
+                        QStringLiteral("tsv")});
 
   const int pageCount = static_cast<int>(files.size());
   QProgressDialog progress(tr("Recognizing page 1 of %1...").arg(pageCount), tr("Cancel"), 0, pageCount, this);
@@ -380,8 +382,9 @@ void OptionsWidget::exportPdf() {
   }
 
   const QString temporaryPdf = outputBase + QStringLiteral(".pdf");
+  const QString temporaryTsv = outputBase + QStringLiteral(".tsv");
   if ((process.exitStatus() != QProcess::NormalExit) || (process.exitCode() != 0)
-      || !QFileInfo::exists(temporaryPdf)) {
+      || !QFileInfo::exists(temporaryPdf) || !QFileInfo::exists(temporaryTsv)) {
     QString details = processOutput.trimmed();
     if (details.size() > 1500) {
       details = details.right(1500);
@@ -392,7 +395,19 @@ void OptionsWidget::exportPdf() {
     return;
   }
 
-  QFile sourcePdf(temporaryPdf);
+  progress.setLabelText(tr("Correcting Arabic and bilingual text order..."));
+  progress.show();
+  QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+  const QString correctedPdf = outputBase + QStringLiteral("-rtl-safe.pdf");
+  QString correctionError;
+  if (!RtlPdfFixer::rewrite(temporaryPdf, temporaryTsv, correctedPdf, &correctionError)) {
+    progress.hide();
+    QMessageBox::warning(this, tr("OCR & PDF Export Failed"), correctionError);
+    return;
+  }
+  progress.hide();
+
+  QFile sourcePdf(correctedPdf);
   QSaveFile destinationPdf(targetPath);
   if (!sourcePdf.open(QIODevice::ReadOnly) || !destinationPdf.open(QIODevice::WriteOnly)) {
     QMessageBox::warning(this, tr("OCR & PDF Export Failed"), tr("Unable to write the selected PDF file."));
