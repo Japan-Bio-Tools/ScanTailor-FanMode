@@ -5,10 +5,19 @@
 
 #include <core/IconProvider.h>
 
+#include <QCoreApplication>
+#include <QDir>
+#include <QEventLoop>
 #include <QFileDialog>
+#include <QFileInfo>
+#include <QInputDialog>
 #include <QMessageBox>
+#include <QProcess>
+#include <QProgressDialog>
+#include <QRegularExpression>
 #include <QSettings>
 #include <QSortFilterProxyModel>
+#include <QStandardPaths>
 #include <QVector>
 #include <deque>
 
@@ -180,6 +189,7 @@ ProjectFilesDialog::ProjectFilesDialog(QWidget* parent)
   inProjectList->setModel(m_inProjectFilesSorted->model());
 
   connect(inpDirBrowseBtn, SIGNAL(clicked()), this, SLOT(inpDirBrowse()));
+  connect(convertPdfBtn, SIGNAL(clicked()), this, SLOT(convertPdf()));
   connect(outDirBrowseBtn, SIGNAL(clicked()), this, SLOT(outDirBrowse()));
   connect(inpDirLine, SIGNAL(textEdited(const QString&)), this, SLOT(inpDirEdited(const QString&)));
   connect(outDirLine, SIGNAL(textEdited(const QString&)), this, SLOT(outDirEdited(const QString&)));
@@ -247,6 +257,179 @@ void ProjectFilesDialog::inpDirBrowse() {
     setInputDir(dir);
     settings.setValue("lastInputDir", dir);
   }
+}
+
+void ProjectFilesDialog::convertPdf() {
+  QSettings settings;
+
+  QString initialDir = settings.value("lastPdfImportDir").toString();
+  if (initialDir.isEmpty() || !QDir(initialDir).exists()) {
+    initialDir = settings.value("lastInputDir").toString();
+  }
+  if (initialDir.isEmpty() || !QDir(initialDir).exists()) {
+    initialDir = QDir::homePath();
+  }
+
+  const QString pdfPath = QFileDialog::getOpenFileName(
+      this, tr("Convert PDF to TIFF"), initialDir, tr("PDF documents (*.pdf);;All files (*)"));
+  if (pdfPath.isEmpty()) {
+    return;
+  }
+
+  bool dpiAccepted = false;
+  const int defaultDpi = settings.value("pdfImportDpi", 300).toInt();
+  const int dpi = QInputDialog::getInt(this, tr("PDF Conversion Quality"), tr("TIFF resolution (DPI):"),
+                                       qBound(72, defaultDpi, 1200), 72, 1200, 50, &dpiAccepted);
+  if (!dpiAccepted) {
+    return;
+  }
+
+#ifdef Q_OS_WIN
+  const QString converterName = QStringLiteral("pdftoppm.exe");
+#else
+  const QString converterName = QStringLiteral("pdftoppm");
+#endif
+  QString converterPath = QDir(QCoreApplication::applicationDirPath()).filePath(converterName);
+  if (!QFileInfo::exists(converterPath)) {
+    converterPath = QStandardPaths::findExecutable(QStringLiteral("pdftoppm"));
+  }
+  if (converterPath.isEmpty()) {
+    QMessageBox::warning(this, tr("PDF Converter Not Found"),
+                         tr("The PDF converter is missing from this installation.\n"
+                            "Please reinstall ScanTailor FanMode."));
+    return;
+  }
+
+  const QFileInfo pdfInfo(pdfPath);
+  const QDir parentDir(pdfInfo.absolutePath());
+  QString folderBase = pdfInfo.completeBaseName().trimmed();
+  if (folderBase.isEmpty()) {
+    folderBase = QStringLiteral("pdf_pages");
+  }
+  folderBase += QStringLiteral("_tiff");
+
+  QString outputDirPath = parentDir.filePath(folderBase);
+  for (int suffix = 2; QFileInfo::exists(outputDirPath); ++suffix) {
+    outputDirPath = parentDir.filePath(folderBase + QStringLiteral("_%1").arg(suffix));
+  }
+  if (!parentDir.mkpath(QFileInfo(outputDirPath).fileName())) {
+    QMessageBox::warning(this, tr("PDF Conversion Failed"),
+                         tr("Unable to create the TIFF folder:\n%1").arg(QDir::toNativeSeparators(outputDirPath)));
+    return;
+  }
+
+  QProcess converter;
+  converter.setProcessChannelMode(QProcess::MergedChannels);
+  converter.setProgram(converterPath);
+  converter.setArguments({QStringLiteral("-r"),
+                          QString::number(dpi),
+                          QStringLiteral("-cropbox"),
+                          QStringLiteral("-tiff"),
+                          QStringLiteral("-tiffcompression"),
+                          QStringLiteral("lzw"),
+                          QStringLiteral("-forcenum"),
+                          QStringLiteral("-progress"),
+                          pdfPath,
+                          QDir(outputDirPath).filePath(QStringLiteral("page"))});
+
+  QProgressDialog progress(tr("Preparing PDF conversion..."), tr("Cancel"), 0, 0, this);
+  progress.setWindowTitle(tr("Convert PDF to TIFF"));
+  progress.setWindowModality(Qt::WindowModal);
+  progress.setMinimumDuration(0);
+  progress.setAutoClose(false);
+  progress.setAutoReset(false);
+
+  const QRegularExpression progressLine(QStringLiteral("^\\s*(\\d+)\\s+(\\d+)\\s+"));
+  QString pendingOutput;
+  QString converterOutput;
+  auto readConverterOutput = [&]() {
+    const QString chunk = QString::fromUtf8(converter.readAllStandardOutput());
+    converterOutput += chunk;
+    pendingOutput += chunk;
+
+    qsizetype newlinePos = 0;
+    while ((newlinePos = pendingOutput.indexOf(QChar('\n'))) >= 0) {
+      const QString line = pendingOutput.left(newlinePos).trimmed();
+      pendingOutput.remove(0, newlinePos + 1);
+      const QRegularExpressionMatch match = progressLine.match(line);
+      if (match.hasMatch()) {
+        const int currentPage = match.captured(1).toInt();
+        const int totalPages = match.captured(2).toInt();
+        if (totalPages > 0) {
+          progress.setRange(0, totalPages);
+          progress.setValue(currentPage);
+          progress.setLabelText(tr("Converting page %1 of %2 to TIFF...").arg(currentPage).arg(totalPages));
+        }
+      }
+    }
+  };
+  connect(&converter, &QProcess::readyReadStandardOutput, this, readConverterOutput);
+
+  bool canceled = false;
+  connect(&progress, &QProgressDialog::canceled, this, [&]() {
+    canceled = true;
+    if (converter.state() != QProcess::NotRunning) {
+      converter.kill();
+    }
+  });
+
+  QEventLoop waitLoop;
+  connect(&converter, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), &waitLoop, &QEventLoop::quit);
+
+  converter.start();
+  if (!converter.waitForStarted(5000)) {
+    progress.hide();
+    QDir(outputDirPath).removeRecursively();
+    QMessageBox::warning(this, tr("PDF Conversion Failed"),
+                         tr("Unable to start the PDF converter:\n%1").arg(converter.errorString()));
+    return;
+  }
+
+  progress.show();
+  if (converter.state() != QProcess::NotRunning) {
+    waitLoop.exec();
+  }
+  readConverterOutput();
+  progress.hide();
+
+  if (canceled) {
+    QDir(outputDirPath).removeRecursively();
+    return;
+  }
+
+  const QStringList tiffFiles
+      = QDir(outputDirPath).entryList({QStringLiteral("*.tif"), QStringLiteral("*.tiff")}, QDir::Files, QDir::Name);
+  if (converter.exitStatus() != QProcess::NormalExit || converter.exitCode() != 0 || tiffFiles.isEmpty()) {
+    QStringList errorLines;
+    const QStringList allLines = converterOutput.split(QRegularExpression(QStringLiteral("[\\r\\n]+")), Qt::SkipEmptyParts);
+    for (const QString& line : allLines) {
+      if (!progressLine.match(line).hasMatch()) {
+        errorLines.append(line.trimmed());
+      }
+    }
+    QString details = errorLines.join(QChar('\n')).trimmed();
+    if (details.size() > 1500) {
+      details = details.right(1500);
+    }
+    QDir(outputDirPath).removeRecursively();
+    QMessageBox::warning(this, tr("PDF Conversion Failed"),
+                         details.isEmpty() ? tr("The PDF could not be converted to TIFF files.")
+                                           : tr("The PDF could not be converted.\n\n%1").arg(details));
+    return;
+  }
+
+  settings.setValue("lastPdfImportDir", pdfInfo.absolutePath());
+  settings.setValue("lastInputDir", outputDirPath);
+  settings.setValue("pdfImportDpi", dpi);
+
+  m_inProjectFiles->clear();
+  m_offProjectFiles->clear();
+  setInputDir(outputDirPath);
+
+  QMessageBox::information(this, tr("PDF Conversion Complete"),
+                           tr("Converted %1 page(s) to lossless TIFF files.\n\n"
+                              "The new TIFF folder is now selected as the Input Directory.")
+                               .arg(tiffFiles.size()));
 }
 
 void ProjectFilesDialog::outDirBrowse() {
@@ -411,6 +594,7 @@ void ProjectFilesDialog::startLoadingMetadata() {
   progressBar->setMaximum(static_cast<int>(m_inProjectFiles->count()));
   inpDirLine->setEnabled(false);
   inpDirBrowseBtn->setEnabled(false);
+  convertPdfBtn->setEnabled(false);
   outDirLine->setEnabled(false);
   outDirBrowseBtn->setEnabled(false);
   addToProjectBtn->setEnabled(false);
@@ -450,6 +634,7 @@ void ProjectFilesDialog::finishLoadingMetadata() {
 
   inpDirLine->setEnabled(true);
   inpDirBrowseBtn->setEnabled(true);
+  convertPdfBtn->setEnabled(true);
   outDirLine->setEnabled(true);
   outDirBrowseBtn->setEnabled(true);
   addToProjectBtn->setEnabled(true);

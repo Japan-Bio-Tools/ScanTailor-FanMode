@@ -28,6 +28,16 @@
        </widget>
       </item>
       <item>
+       <widget class="QPushButton" name="convertPdfBtn">
+        <property name="toolTip">
+         <string>Convert every page of a PDF into lossless TIFF files, then use that folder as the project input.</string>
+        </property>
+        <property name="text">
+         <string>Convert PDF...</string>
+        </property>
+       </widget>
+      </item>
+      <item>
        <widget class="QPushButton" name="inpDirBrowseBtn">
         <property name="text">
          <string>Browse</string>

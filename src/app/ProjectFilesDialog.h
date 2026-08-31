@@ -36,6 +36,8 @@ class ProjectFilesDialog : public QDialog, private Ui::ProjectFilesDialog {
 
   void inpDirBrowse();
 
+  void convertPdf();
+
   void outDirBrowse();
 
   void inpDirEdited(const QString& text);

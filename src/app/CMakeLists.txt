@@ -81,6 +81,19 @@ target_include_directories(
     "$<TARGET_PROPERTY:TIFF::TIFF,INTERFACE_INCLUDE_DIRECTORIES>")
 install(TARGETS ${target_name} RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 
+find_program(SCANTAILOR_PDFTOPPM_EXECUTABLE NAMES pdftoppm pdftoppm.exe)
+if (SCANTAILOR_PDFTOPPM_EXECUTABLE)
+  add_custom_command(
+      TARGET ${target_name}
+      POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+              "${SCANTAILOR_PDFTOPPM_EXECUTABLE}"
+              "$<TARGET_FILE_DIR:${target_name}>"
+      COMMENT "bundle the PDF-to-TIFF converter")
+else()
+  message(WARNING "pdftoppm was not found; Convert PDF will require it on PATH at runtime")
+endif()
+
 if (Qt6_FOUND AND WIN32)
   #manage plugins with windeployqt.
   add_custom_command(

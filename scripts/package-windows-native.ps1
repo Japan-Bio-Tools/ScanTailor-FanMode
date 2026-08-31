@@ -12,14 +12,24 @@ $packageDir = Join-Path $artifactsDir $packageName
 $zipPath = Join-Path $artifactsDir "$packageName.zip"
 $executable = Join-Path $buildDir 'scantailor-fanmode.exe'
 $msysRoot = Join-Path $env:LOCALAPPDATA 'Programs\MSYS2'
-$ucrtBin = Join-Path $msysRoot 'ucrt64\bin'
+$ucrtRoot = Join-Path $msysRoot 'ucrt64'
+$ucrtBin = Join-Path $ucrtRoot 'bin'
 $objdump = Join-Path $ucrtBin 'objdump.exe'
+$pdfConverter = Join-Path $buildDir 'pdftoppm.exe'
+$popplerData = Join-Path $ucrtRoot 'share\poppler'
+$popplerDataLicenses = Join-Path $ucrtRoot 'share\licenses\poppler-data'
 
 if (-not (Test-Path -LiteralPath $executable)) {
     throw "Build FanMode before packaging. Missing executable: $executable"
 }
 if (-not (Test-Path -LiteralPath $objdump)) {
     throw "MSYS2 objdump was not found: $objdump"
+}
+if (-not (Test-Path -LiteralPath $pdfConverter)) {
+    throw "Bundled PDF converter was not found: $pdfConverter"
+}
+if (-not (Test-Path -LiteralPath $popplerData)) {
+    throw "Poppler encoding data was not found: $popplerData"
 }
 
 New-Item -ItemType Directory -Path $artifactsDir -Force | Out-Null
@@ -36,6 +46,7 @@ if (Test-Path -LiteralPath $resolvedPackage) {
 New-Item -ItemType Directory -Path $resolvedPackage -Force | Out-Null
 
 Copy-Item -LiteralPath $executable -Destination $resolvedPackage
+Copy-Item -LiteralPath $pdfConverter -Destination $resolvedPackage
 Get-ChildItem -LiteralPath $buildDir -Filter '*.dll' -File | Copy-Item -Destination $resolvedPackage
 Get-ChildItem -LiteralPath $buildDir -Filter 'scantailor-advanced_*.qm' -File |
     Copy-Item -Destination $resolvedPackage
@@ -45,6 +56,15 @@ foreach ($pluginDir in @('generic', 'iconengines', 'imageformats', 'networkinfor
     if (Test-Path -LiteralPath $sourcePluginDir) {
         Copy-Item -LiteralPath $sourcePluginDir -Destination $resolvedPackage -Recurse
     }
+}
+
+$packageShareDir = Join-Path $resolvedPackage 'share'
+New-Item -ItemType Directory -Path $packageShareDir -Force | Out-Null
+Copy-Item -LiteralPath $popplerData -Destination $packageShareDir -Recurse
+if (Test-Path -LiteralPath $popplerDataLicenses) {
+    $thirdPartyLicenses = Join-Path $resolvedPackage 'THIRD-PARTY-LICENSES'
+    New-Item -ItemType Directory -Path $thirdPartyLicenses -Force | Out-Null
+    Copy-Item -LiteralPath $popplerDataLicenses -Destination $thirdPartyLicenses -Recurse
 }
 
 # Copy every non-system MinGW dependency, including dependencies of plugins.
@@ -83,6 +103,7 @@ $buildInfo = @(
     'ScanTailor FanMode portable Windows build'
     "FanMode version: $Version"
     'Architecture: x64'
+    'PDF import: Poppler pdftoppm with lossless LZW TIFF output'
     'License: GNU GPL version 3 (see LICENSE.txt)'
 )
 $buildInfo | Set-Content -LiteralPath (Join-Path $resolvedPackage 'BUILD-INFO.txt') -Encoding UTF8
