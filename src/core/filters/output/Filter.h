@@ -60,6 +60,8 @@ class Filter : public AbstractFilter {
 
   OptionsWidget* optionsWidget();
 
+  PageId frontCoverPageId() const;
+
   std::vector<PageOrderOption> pageOrderOptions() const override;
 
   int selectedPageOrder() const override;

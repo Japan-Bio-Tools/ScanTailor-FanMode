@@ -86,7 +86,8 @@ FilterResultPtr Task::process(const TaskStatus& status,
 
   if (m_nextTask) {
     const QPolygonF contentRectPhys(data.xform().transformBack().map(adaptedContentRect));
-    const QPolygonF pageRectPhys(Utils::calcPageRectPhys(data.xform(), contentRectPhys, params, aggHardSizeAfter));
+    const QPolygonF pageRectPhys(
+        Utils::calcPageRectPhys(data.xform(), contentRectPhys, params, m_settings->getTargetPageSizeMM(m_pageId)));
 
     ImageTransformation newXform(data.xform());
     newXform.setPostCropArea(Utils::shiftToRoundedOrigin(newXform.transform().map(pageRectPhys)));

@@ -10,6 +10,7 @@
 #include <QIcon>
 #include <QPalette>
 #include <QSize>
+#include <QSizeF>
 #include <QWidget>
 #include <memory>
 #include <set>
@@ -29,6 +30,7 @@ class QLineEdit;
 
 namespace page_layout {
 class Settings;
+enum class PageSizeMode;
 
 class OptionsWidget : public FilterOptionsWidget, public UnitsListener, private Ui::OptionsWidget {
   Q_OBJECT
@@ -39,7 +41,11 @@ class OptionsWidget : public FilterOptionsWidget, public UnitsListener, private 
 
   ~OptionsWidget() override;
 
-  void preUpdateUI(const PageInfo& pageInfo, const Margins& marginsMm, const Alignment& alignment);
+  void preUpdateUI(const PageInfo& pageInfo,
+                   const Margins& marginsMm,
+                   const Alignment& alignment,
+                   PageSizeMode pageSizeMode,
+                   const QSizeF& customPageSizeMm);
 
   void postUpdateUI();
 
@@ -97,6 +103,12 @@ class OptionsWidget : public FilterOptionsWidget, public UnitsListener, private 
 
   void freezeAggregateHardSizeToggled(bool checked);
 
+  void pageSizeModeChanged(int index);
+
+  void customPageSizeEditingFinished();
+
+  void showApplyPageSizeDialog();
+
   void onFixDpiClicked();
 
   void sourceDpiComboActivated(int index);
@@ -110,6 +122,8 @@ class OptionsWidget : public FilterOptionsWidget, public UnitsListener, private 
                     bool applyBottom = true);
 
   void applyAlignment(const std::set<PageId>& pages);
+
+  void applyPageSize(const std::set<PageId>& pages);
 
  private:
   using AlignmentByButton = std::unordered_map<QToolButton*, Alignment>;
@@ -125,6 +139,12 @@ class OptionsWidget : public FilterOptionsWidget, public UnitsListener, private 
   void updateAutoModeButtons();
 
   void updateAlignmentModeEnabled();
+
+  void updatePageSizeDisplay();
+
+  void updatePageSizeControlsEnabled();
+
+  void commitCustomPageSize();
 
   QToolButton* getCheckedAlignmentButton() const;
 
@@ -160,6 +180,8 @@ class OptionsWidget : public FilterOptionsWidget, public UnitsListener, private 
   QWidget* m_sourceDpiFocusWidget;
   Margins m_marginsMM;
   Alignment m_alignment;
+  PageSizeMode m_pageSizeMode;
+  QSizeF m_customPageSizeMM;
   bool m_leftRightLinked;
   bool m_topBottomLinked;
   QButtonGroup* m_alignmentButtonGroup;

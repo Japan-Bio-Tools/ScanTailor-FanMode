@@ -5,6 +5,7 @@
 #define SCANTAILOR_PAGE_LAYOUT_FILTER_H_
 
 #include <QCoreApplication>
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -12,6 +13,7 @@
 #include "FilterResult.h"
 #include "NonCopyable.h"
 #include "PageOrderOption.h"
+#include "PageId.h"
 #include "PageView.h"
 #include "SafeDeletingQObjectPtr.h"
 
@@ -37,7 +39,9 @@ class Filter : public AbstractFilter {
 
   Q_DECLARE_TR_FUNCTIONS(page_layout::Filter)
  public:
-  Filter(std::shared_ptr<ProjectPages> pageSequence, const PageSelectionAccessor& pageSelectionAccessor);
+  Filter(std::shared_ptr<ProjectPages> pageSequence,
+         const PageSelectionAccessor& pageSelectionAccessor,
+         std::function<PageId()> frontCoverProvider = std::function<PageId()>());
 
   ~Filter() override;
 

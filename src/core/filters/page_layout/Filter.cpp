@@ -24,8 +24,12 @@
 #include "Utils.h"
 
 namespace page_layout {
-Filter::Filter(std::shared_ptr<ProjectPages> pages, const PageSelectionAccessor& pageSelectionAccessor)
-    : m_pages(std::move(pages)), m_settings(std::make_shared<Settings>()), m_selectedPageOrder(0) {
+Filter::Filter(std::shared_ptr<ProjectPages> pages,
+               const PageSelectionAccessor& pageSelectionAccessor,
+               std::function<PageId()> frontCoverProvider)
+    : m_pages(std::move(pages)),
+      m_settings(std::make_shared<Settings>(std::move(frontCoverProvider))),
+      m_selectedPageOrder(0) {
   m_optionsWidget.reset(new OptionsWidget(m_settings, m_pages, pageSelectionAccessor));
 
   const PageOrderOption::ProviderPtr defaultOrder;
@@ -72,7 +76,10 @@ void Filter::performRelinking(const AbstractRelinker& relinker) {
 void Filter::preUpdateUI(FilterUiInterface* ui, const PageInfo& pageInfo) {
   const Margins marginsMm(m_settings->getHardMarginsMM(pageInfo.id()));
   const Alignment alignment(m_settings->getPageAlignment(pageInfo.id()));
-  m_optionsWidget->preUpdateUI(pageInfo, marginsMm, alignment);
+  const std::unique_ptr<Params> params(m_settings->getPageParams(pageInfo.id()));
+  m_optionsWidget->preUpdateUI(pageInfo, marginsMm, alignment,
+                               params ? params->pageSizeMode() : PageSizeMode::AUTO,
+                               params ? params->customPageSizeMM() : QSizeF());
   ui->setOptionsWidget(m_optionsWidget.get(), ui->KEEP_OWNERSHIP);
 }
 

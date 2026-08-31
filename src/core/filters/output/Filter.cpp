@@ -161,6 +161,10 @@ OptionsWidget* Filter::optionsWidget() {
   return m_optionsWidget.get();
 }
 
+PageId Filter::frontCoverPageId() const {
+  return m_settings->coverPageId(CoverRole::FRONT);
+}
+
 std::vector<PageOrderOption> Filter::pageOrderOptions() const {
   return m_pageOrderOptions;
 }

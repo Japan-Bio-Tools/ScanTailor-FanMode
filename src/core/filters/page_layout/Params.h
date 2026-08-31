@@ -15,6 +15,12 @@ class QDomElement;
 class QString;
 
 namespace page_layout {
+enum class PageSizeMode {
+  AUTO = 0,
+  CUSTOM = 1,
+  FRONT_COVER = 2
+};
+
 class Params {
   // Member-wise copying is OK.
  public:
@@ -23,7 +29,9 @@ class Params {
          const QRectF& contentRect,
          const QSizeF& contentSizeMm,
          const Alignment& alignment,
-         bool autoMargins);
+         bool autoMargins,
+         PageSizeMode pageSizeMode = PageSizeMode::AUTO,
+         const QSizeF& customPageSizeMm = QSizeF());
 
   explicit Params(const QDomElement& el);
 
@@ -39,6 +47,14 @@ class Params {
 
   bool isAutoMarginsEnabled() const;
 
+  PageSizeMode pageSizeMode() const;
+
+  void setPageSizeMode(PageSizeMode mode);
+
+  const QSizeF& customPageSizeMM() const;
+
+  void setCustomPageSizeMM(const QSizeF& sizeMm);
+
   QDomElement toXml(QDomDocument& doc, const QString& name) const;
 
  private:
@@ -48,6 +64,8 @@ class Params {
   QSizeF m_contentSizeMM;
   Alignment m_alignment;
   bool m_autoMargins;
+  PageSizeMode m_pageSizeMode;
+  QSizeF m_customPageSizeMM;
 };
 
 
@@ -73,6 +91,22 @@ inline const Alignment& Params::alignment() const {
 
 inline bool Params::isAutoMarginsEnabled() const {
   return m_autoMargins;
+}
+
+inline PageSizeMode Params::pageSizeMode() const {
+  return m_pageSizeMode;
+}
+
+inline void Params::setPageSizeMode(const PageSizeMode mode) {
+  m_pageSizeMode = mode;
+}
+
+inline const QSizeF& Params::customPageSizeMM() const {
+  return m_customPageSizeMM;
+}
+
+inline void Params::setCustomPageSizeMM(const QSizeF& sizeMm) {
+  m_customPageSizeMM = sizeMm;
 }
 }  // namespace page_layout
 #endif  // ifndef SCANTAILOR_PAGE_LAYOUT_PARAMS_H_

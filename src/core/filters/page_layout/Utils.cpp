@@ -205,7 +205,13 @@ QPolygonF Utils::calcPageRectPhys(const ImageTransformation& xform,
   extendPolyRectWithMargins(polyMm, params.hardMarginsMM());
 
   const QSizeF hardSizeMm(QLineF(polyMm[0], polyMm[1]).length(), QLineF(polyMm[0], polyMm[3]).length());
-  Margins softMarginsMm(calcSoftMarginsMM(hardSizeMm, aggregateHardSizeMm, params.alignment(), params.contentRect(),
+  Alignment alignment(params.alignment());
+  if (params.pageSizeMode() != PageSizeMode::AUTO) {
+    // Custom and cover-based sizes describe an explicit canvas, so alignment
+    // controls content placement even when "match size with other pages" is off.
+    alignment.setNull(false);
+  }
+  Margins softMarginsMm(calcSoftMarginsMM(hardSizeMm, aggregateHardSizeMm, alignment, params.contentRect(),
                                           params.contentSizeMM(), params.pageRect()));
 
   extendPolyRectWithMargins(polyMm, softMarginsMm);

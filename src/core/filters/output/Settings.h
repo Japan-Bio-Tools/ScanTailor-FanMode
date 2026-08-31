@@ -98,6 +98,9 @@ class Settings {
 
   void setStretchCover(const PageId& pageId, bool stretch);
 
+  /** Returns the page assigned to a cover role, or a null PageId. */
+  PageId coverPageId(CoverRole role) const;
+
  private:
   using PerPageParams = std::unordered_map<PageId, Params>;
   using PerPageOutputParams = std::unordered_map<PageId, OutputParams>;

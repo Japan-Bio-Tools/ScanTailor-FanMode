@@ -70,8 +70,8 @@ class StageSequence {
   std::shared_ptr<page_split::Filter> m_pageSplitFilter;
   std::shared_ptr<deskew::Filter> m_deskewFilter;
   std::shared_ptr<select_content::Filter> m_selectContentFilter;
-  std::shared_ptr<page_layout::Filter> m_pageLayoutFilter;
   std::shared_ptr<output::Filter> m_outputFilter;
+  std::shared_ptr<page_layout::Filter> m_pageLayoutFilter;
   std::vector<FilterPtr> m_filters;
   int m_fixOrientationFilterIdx;
   int m_pageSplitFilterIdx;

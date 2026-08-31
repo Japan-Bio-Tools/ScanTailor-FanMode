@@ -44,7 +44,7 @@ ImageView::ImageView(const std::shared_ptr<Settings>& settings,
       m_mmToPixelsXform(m_pixelsToMmXform.inverted()),
       m_xform(xform),
       m_innerRect(adaptedContentRect),
-      m_aggregateHardSizeMM(settings->getAggregateHardSizeMM()),
+      m_aggregateHardSizeMM(settings->getTargetPageSizeMM(pageId)),
       m_committedAggregateHardSizeMM(m_aggregateHardSizeMM),
       m_alignment(optWidget.alignment()),
       m_leftRightLinked(optWidget.leftRightLinked()),
@@ -223,7 +223,7 @@ void ImageView::alignmentChanged(const Alignment& alignment) {
 }
 
 void ImageView::aggregateHardSizeChanged() {
-  m_aggregateHardSizeMM = m_settings->getAggregateHardSizeMM();
+  m_aggregateHardSizeMM = m_settings->getTargetPageSizeMM(m_pageId);
   m_committedAggregateHardSizeMM = m_aggregateHardSizeMM;
   recalcOuterRect();
   updatePresentationTransform(FIT);
@@ -412,7 +412,8 @@ void ImageView::innerRectDragContinuation(int edgeMask, const QPointF& mousePos)
   fp += QPointF(effectiveDx, effectiveDy);
   setWidgetFocalPoint(fp);
 
-  m_aggregateHardSizeMM = m_settings->getAggregateHardSizeMM(m_pageId, origRectToSizeMM(m_middleRect), m_alignment);
+  m_aggregateHardSizeMM
+      = m_settings->getTargetPageSizeMM(m_pageId, origRectToSizeMM(m_middleRect), m_alignment);
 
   recalcOuterRect();
 
@@ -474,7 +475,8 @@ void ImageView::middleRectDragContinuation(const int edgeMask, const QPointF& mo
     forceNonNegativeHardMargins(m_middleRect);  // invalidates widgetRect
   }
 
-  m_aggregateHardSizeMM = m_settings->getAggregateHardSizeMM(m_pageId, origRectToSizeMM(m_middleRect), m_alignment);
+  m_aggregateHardSizeMM
+      = m_settings->getTargetPageSizeMM(m_pageId, origRectToSizeMM(m_middleRect), m_alignment);
 
   recalcOuterRect();
 
@@ -510,8 +512,12 @@ void ImageView::recalcBoxesAndFit(const Margins& marginsMm) {
   const QRectF middleRect(mmToVirt.map(polyMm).boundingRect());
 
   const QSizeF hardSizeMm(QLineF(polyMm[0], polyMm[1]).length(), QLineF(polyMm[0], polyMm[3]).length());
+  Alignment alignment(m_alignment);
+  if (m_settings->getPageSizeMode(m_pageId) != PageSizeMode::AUTO) {
+    alignment.setNull(false);
+  }
   const Margins softMarginsMm(Utils::calcSoftMarginsMM(
-      hardSizeMm, m_aggregateHardSizeMM, m_alignment, m_settings->getPageParams(m_pageId)->contentRect(),
+      hardSizeMm, m_aggregateHardSizeMM, alignment, m_settings->getPageParams(m_pageId)->contentRect(),
       m_settings->getPageParams(m_pageId)->contentSizeMM(), m_settings->getPageParams(m_pageId)->pageRect()));
 
   Utils::extendPolyRectWithMargins(polyMm, softMarginsMm);
@@ -597,8 +603,12 @@ void ImageView::recalcOuterRect() {
   QPolygonF polyMm(virtToMm.map(m_middleRect));
 
   const QSizeF hardSizeMm(QLineF(polyMm[0], polyMm[1]).length(), QLineF(polyMm[0], polyMm[3]).length());
+  Alignment alignment(m_alignment);
+  if (m_settings->getPageSizeMode(m_pageId) != PageSizeMode::AUTO) {
+    alignment.setNull(false);
+  }
   const Margins softMarginsMm(Utils::calcSoftMarginsMM(
-      hardSizeMm, m_aggregateHardSizeMM, m_alignment, m_settings->getPageParams(m_pageId)->contentRect(),
+      hardSizeMm, m_aggregateHardSizeMM, alignment, m_settings->getPageParams(m_pageId)->contentRect(),
       m_settings->getPageParams(m_pageId)->contentSizeMM(), m_settings->getPageParams(m_pageId)->pageRect()));
 
   Utils::extendPolyRectWithMargins(polyMm, softMarginsMm);
@@ -621,7 +631,7 @@ QSizeF ImageView::origRectToSizeMM(const QRectF& rect) const {
 
 ImageView::AggregateSizeChanged ImageView::commitHardMargins(const Margins& marginsMm) {
   m_settings->setHardMarginsMM(m_pageId, marginsMm);
-  m_aggregateHardSizeMM = m_settings->getAggregateHardSizeMM();
+  m_aggregateHardSizeMM = m_settings->getTargetPageSizeMM(m_pageId);
 
   AggregateSizeChanged changed = AGGREGATE_SIZE_UNCHANGED;
   if (m_committedAggregateHardSizeMM != m_aggregateHardSizeMM) {
@@ -925,7 +935,8 @@ void ImageView::innerRectMoveRequest(const QPointF& mousePos, const Qt::Keyboard
   fp += delta;
   setWidgetFocalPoint(fp);
 
-  m_aggregateHardSizeMM = m_settings->getAggregateHardSizeMM(m_pageId, origRectToSizeMM(m_middleRect), m_alignment);
+  m_aggregateHardSizeMM
+      = m_settings->getTargetPageSizeMM(m_pageId, origRectToSizeMM(m_middleRect), m_alignment);
 
   recalcOuterRect();
 

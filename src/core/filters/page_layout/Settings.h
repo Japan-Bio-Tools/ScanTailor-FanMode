@@ -6,12 +6,13 @@
 
 #include <DeviationProvider.h>
 
+#include <functional>
 #include <memory>
 
 #include "Margins.h"
 #include "NonCopyable.h"
+#include "PageId.h"
 
-class PageId;
 class Margins;
 class PageSequence;
 class AbstractRelinker;
@@ -22,6 +23,7 @@ namespace page_layout {
 class Params;
 class Alignment;
 class Guide;
+enum class PageSizeMode;
 
 class Settings {
   DECLARE_NON_COPYABLE(Settings)
@@ -29,7 +31,9 @@ class Settings {
  public:
   enum AggregateSizeChanged { AGGREGATE_SIZE_UNCHANGED, AGGREGATE_SIZE_CHANGED };
 
-  Settings();
+  using FrontCoverProvider = std::function<PageId()>;
+
+  explicit Settings(FrontCoverProvider frontCoverProvider = FrontCoverProvider());
 
   virtual ~Settings();
 
@@ -154,6 +158,22 @@ class Settings {
 
   void setPageAutoMarginsEnabled(const PageId& pageId, bool state);
 
+  PageSizeMode getPageSizeMode(const PageId& pageId) const;
+
+  QSizeF getCustomPageSizeMM(const PageId& pageId) const;
+
+  void setPageSize(const PageId& pageId, PageSizeMode mode, const QSizeF& customSizeMm);
+
+  /** Returns the final target page size for the stored margins and alignment. */
+  QSizeF getTargetPageSizeMM(const PageId& pageId) const;
+
+  /** Same as above, while previewing an uncommitted hard page size. */
+  QSizeF getTargetPageSizeMM(const PageId& pageId,
+                             const QSizeF& hardSizeMm,
+                             const Alignment& alignment) const;
+
+  bool hasFrontCover() const;
+
   const DeviationProvider<PageId>& deviationProvider() const;
 
   std::vector<Guide>& guides();
@@ -169,6 +189,7 @@ class Settings {
   class ModifyAlignment;
 
   class ModifyContentSize;
+  class ModifyPageSize;
 
   std::unique_ptr<Impl> m_impl;
 };

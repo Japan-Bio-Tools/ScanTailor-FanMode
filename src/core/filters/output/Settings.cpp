@@ -354,4 +354,14 @@ void Settings::setStretchCover(const PageId& pageId, const bool stretch) {
     it->second.setStretchCover(stretch);
   }
 }
+
+PageId Settings::coverPageId(const CoverRole role) const {
+  const QMutexLocker locker(&m_mutex);
+  for (const auto& entry : m_perPageParams) {
+    if (entry.second.coverRole() == role) {
+      return entry.first;
+    }
+  }
+  return PageId();
+}
 }  // namespace output

@@ -4,6 +4,7 @@
 #include "OptionsWidget.h"
 
 #include <ColorSchemeManager.h>
+#include <Units.h>
 #include <UnitsProvider.h>
 #include <core/IconProvider.h>
 
@@ -15,6 +16,7 @@
 #include "../../Utils.h"
 #include "ApplyDialog.h"
 #include "ApplyMarginsDialog.h"
+#include "Params.h"
 #include "ProjectPages.h"
 #include "Settings.h"
 
@@ -27,10 +29,11 @@ OptionsWidget::OptionsWidget(std::shared_ptr<Settings> settings,
     : m_settings(std::move(settings)),
       m_pages(std::move(pages)),
       m_pageSelectionAccessor(pageSelectionAccessor),
+      m_sourceDpiFocusWidget(nullptr),
+      m_pageSizeMode(PageSizeMode::AUTO),
       m_leftRightLinked(true),
       m_topBottomLinked(true),
-      m_connectionManager(std::bind(&OptionsWidget::setupUiConnections, this)),
-      m_sourceDpiFocusWidget(nullptr) {
+      m_connectionManager(std::bind(&OptionsWidget::setupUiConnections, this)) {
   {
     QSettings appSettings;
     m_leftRightLinked = appSettings.value("margins/leftRightLinked", true).toBool();
@@ -38,6 +41,9 @@ OptionsWidget::OptionsWidget(std::shared_ptr<Settings> settings,
   }
 
   setupUi(this);
+  pageSizeModeCombo->addItem(tr("Auto"), static_cast<int>(PageSizeMode::AUTO));
+  pageSizeModeCombo->addItem(tr("Custom (manual)"), static_cast<int>(PageSizeMode::CUSTOM));
+  pageSizeModeCombo->addItem(tr("Front cover size"), static_cast<int>(PageSizeMode::FRONT_COVER));
   setupIcons();
   setupSourceDpiControls();
 
@@ -65,7 +71,11 @@ OptionsWidget::OptionsWidget(std::shared_ptr<Settings> settings,
 
 OptionsWidget::~OptionsWidget() = default;
 
-void OptionsWidget::preUpdateUI(const PageInfo& pageInfo, const Margins& marginsMm, const Alignment& alignment) {
+void OptionsWidget::preUpdateUI(const PageInfo& pageInfo,
+                                const Margins& marginsMm,
+                                const Alignment& alignment,
+                                const PageSizeMode pageSizeMode,
+                                const QSizeF& customPageSizeMm) {
   commitSourceDpiIfValid();
   m_sourceDpiFocusWidget = isSourceDpiFieldFocused() ? focusWidget() : nullptr;
 
@@ -76,6 +86,13 @@ void OptionsWidget::preUpdateUI(const PageInfo& pageInfo, const Margins& margins
   m_sourceImagePixelSize = pageInfo.metadata().size();
   m_marginsMM = marginsMm;
   m_alignment = alignment;
+  m_pageSizeMode = pageSizeMode;
+  m_customPageSizeMM = customPageSizeMm;
+
+  if ((m_pageSizeMode != PageSizeMode::AUTO) && m_alignment.isNull()) {
+    m_alignment.setNull(false);
+    m_settings->setPageAlignment(m_pageId, m_alignment);
+  }
 
   for (const auto& [button, btnAlignment] : m_alignmentByButton) {
     if (alignment.isAutoVertical()) {
@@ -95,6 +112,10 @@ void OptionsWidget::preUpdateUI(const PageInfo& pageInfo, const Margins& margins
   }
 
   alignWithOthersCB->setChecked(!alignment.isNull());
+  if (m_pageSizeMode != PageSizeMode::AUTO) {
+    alignWithOthersCB->setChecked(true);
+  }
+  alignWithOthersCB->setEnabled(m_pageSizeMode == PageSizeMode::AUTO);
   freezeAggregateHardSizeCb->setChecked(m_settings->isAggregateHardSizeFrozen());
 
   if (alignment.horizontal() == Alignment::HAUTO) {
@@ -124,6 +145,7 @@ void OptionsWidget::preUpdateUI(const PageInfo& pageInfo, const Margins& margins
   updateLinkDisplay(leftRightLink, m_leftRightLinked);
 
   marginsGroup->setEnabled(false);
+  pageSizeGroup->setEnabled(false);
   alignmentGroup->setEnabled(false);
   keepSourceDpiFieldsEnabled();
 
@@ -134,10 +156,12 @@ void OptionsWidget::postUpdateUI() {
   auto block = m_connectionManager.getScopedBlock();
 
   marginsGroup->setEnabled(true);
+  pageSizeGroup->setEnabled(true);
   alignmentGroup->setEnabled(true);
 
   m_marginsMM = m_settings->getHardMarginsMM(m_pageId);
   updateMarginsDisplay();
+  updatePageSizeDisplay();
   updateSourceDpiDisplay();
 
   if (m_sourceDpiFocusWidget) {
@@ -184,7 +208,14 @@ void OptionsWidget::onUnitsChanged(Units units) {
   rightMarginSpinBox->setDecimals(decimals);
   rightMarginSpinBox->setSingleStep(step);
 
+  customPageWidthSpinBox->setDecimals(decimals);
+  customPageWidthSpinBox->setSingleStep(step);
+  customPageHeightSpinBox->setDecimals(decimals);
+  customPageHeightSpinBox->setSingleStep(step);
+  customPageSizeUnitsLabel->setText(unitsToLocalizedString(units));
+
   updateMarginsDisplay();
+  updatePageSizeDisplay();
 }
 
 void OptionsWidget::horMarginsChanged(const double val) {
@@ -402,6 +433,79 @@ void OptionsWidget::freezeAggregateHardSizeToggled(const bool checked) {
   emit aggregateHardSizeChanged();
 }
 
+void OptionsWidget::pageSizeModeChanged(const int index) {
+  const QVariant value(pageSizeModeCombo->itemData(index));
+  if (!value.isValid()) {
+    return;
+  }
+
+  m_pageSizeMode = static_cast<PageSizeMode>(value.toInt());
+  if ((m_pageSizeMode == PageSizeMode::CUSTOM)
+      && (!m_customPageSizeMM.isValid() || m_customPageSizeMM.isEmpty())) {
+    m_customPageSizeMM = m_settings->getTargetPageSizeMM(m_pageId);
+    if (!m_customPageSizeMM.isValid() || m_customPageSizeMM.isEmpty()) {
+      m_customPageSizeMM = QSizeF(210.0, 297.0);
+    }
+  }
+
+  if ((m_pageSizeMode != PageSizeMode::AUTO) && m_alignment.isNull()) {
+    m_alignment.setNull(false);
+    m_settings->setPageAlignment(m_pageId, m_alignment);
+    emit alignmentChanged(m_alignment);
+  }
+
+  m_settings->setPageSize(m_pageId, m_pageSizeMode, m_customPageSizeMM);
+  updatePageSizeDisplay();
+  emit aggregateHardSizeChanged();
+  emit invalidateAllThumbnails();
+}
+
+void OptionsWidget::customPageSizeEditingFinished() {
+  commitCustomPageSize();
+}
+
+void OptionsWidget::commitCustomPageSize() {
+  if (m_pageSizeMode != PageSizeMode::CUSTOM) {
+    return;
+  }
+
+  double width = customPageWidthSpinBox->value();
+  double height = customPageHeightSpinBox->value();
+  UnitsProvider::getInstance().convertTo(width, height, MILLIMETRES, m_dpi);
+  const QSizeF newSizeMm(width, height);
+  if (newSizeMm == m_customPageSizeMM) {
+    return;
+  }
+
+  m_customPageSizeMM = newSizeMm;
+  m_settings->setPageSize(m_pageId, m_pageSizeMode, m_customPageSizeMM);
+  updatePageSizeDisplay();
+  emit aggregateHardSizeChanged();
+  emit invalidateAllThumbnails();
+}
+
+void OptionsWidget::showApplyPageSizeDialog() {
+  auto* dialog = new ApplyDialog(this, m_pageId, m_pageSelectionAccessor);
+  dialog->setAttribute(Qt::WA_DeleteOnClose);
+  dialog->setWindowTitle(tr("Apply Page Size"));
+  connect(dialog, SIGNAL(accepted(const std::set<PageId>&)), this, SLOT(applyPageSize(const std::set<PageId>&)));
+  dialog->show();
+}
+
+void OptionsWidget::applyPageSize(const std::set<PageId>& pages) {
+  if (pages.empty()) {
+    return;
+  }
+
+  commitCustomPageSize();
+  for (const PageId& pageId : pages) {
+    m_settings->setPageSize(pageId, m_pageSizeMode, m_customPageSizeMM);
+  }
+
+  emit aggregateHardSizeChanged();
+  emit invalidateAllThumbnails();
+}
+
 void OptionsWidget::updateMarginsDisplay() {
   auto block = m_connectionManager.getScopedBlock();
 
@@ -421,6 +525,59 @@ void OptionsWidget::updateMarginsDisplay() {
   m_topBottomLinked = m_topBottomLinked && (topMarginSpinBox->value() == bottomMarginSpinBox->value());
   updateLinkDisplay(topBottomLink, m_topBottomLinked);
   updateLinkDisplay(leftRightLink, m_leftRightLinked);
+}
+
+void OptionsWidget::updatePageSizeDisplay() {
+  auto block = m_connectionManager.getScopedBlock();
+
+  const int modeIndex = pageSizeModeCombo->findData(static_cast<int>(m_pageSizeMode));
+  if (modeIndex >= 0) {
+    pageSizeModeCombo->setCurrentIndex(modeIndex);
+  }
+
+  QSizeF displayedSize(m_customPageSizeMM);
+  double width = displayedSize.width();
+  double height = displayedSize.height();
+  if (displayedSize.isValid() && !displayedSize.isEmpty()) {
+    UnitsProvider::getInstance().convertFrom(width, height, MILLIMETRES, m_dpi);
+    customPageWidthSpinBox->setValue(width);
+    customPageHeightSpinBox->setValue(height);
+  }
+
+  switch (m_pageSizeMode) {
+    case PageSizeMode::CUSTOM:
+      pageSizeStatusLabel->setText(
+          tr("This size is stored for the current page. If content is larger, the page expands to avoid cropping."));
+      break;
+    case PageSizeMode::FRONT_COVER:
+      pageSizeStatusLabel->setText(
+          m_settings->hasFrontCover()
+              ? tr("Uses the final content and margins size of the page marked Front cover in Output.")
+              : tr("No front cover is selected in Output. Auto size is used until a front cover is selected."));
+      break;
+    case PageSizeMode::AUTO:
+    default:
+      pageSizeStatusLabel->setText(tr("Uses the automatically calculated project page size."));
+      break;
+  }
+
+  updatePageSizeControlsEnabled();
+}
+
+void OptionsWidget::updatePageSizeControlsEnabled() {
+  const bool custom = m_pageSizeMode == PageSizeMode::CUSTOM;
+  customPageWidthLabel->setVisible(custom);
+  customPageWidthSpinBox->setVisible(custom);
+  customPageHeightLabel->setVisible(custom);
+  customPageHeightSpinBox->setVisible(custom);
+  customPageSizeUnitsLabel->setVisible(custom);
+
+  const bool automatic = m_pageSizeMode == PageSizeMode::AUTO;
+  alignWithOthersCB->setEnabled(automatic);
+  if (!automatic) {
+    alignWithOthersCB->setChecked(true);
+  }
+  updateAlignmentModeEnabled();
 }
 
 void OptionsWidget::updateLinkDisplay(QToolButton* button, const bool linked) {
@@ -474,6 +631,10 @@ void OptionsWidget::setupUiConnections() {
   CONNECT(applyAlignmentBtn, SIGNAL(clicked()), this, SLOT(showApplyAlignmentDialog()));
   CONNECT(matchSizeToAllBtn, SIGNAL(clicked()), this, SLOT(matchSizeToAllPages()));
   CONNECT(freezeAggregateHardSizeCb, SIGNAL(clicked(bool)), this, SLOT(freezeAggregateHardSizeToggled(bool)));
+  CONNECT(pageSizeModeCombo, SIGNAL(currentIndexChanged(int)), this, SLOT(pageSizeModeChanged(int)));
+  CONNECT(customPageWidthSpinBox, SIGNAL(editingFinished()), this, SLOT(customPageSizeEditingFinished()));
+  CONNECT(customPageHeightSpinBox, SIGNAL(editingFinished()), this, SLOT(customPageSizeEditingFinished()));
+  CONNECT(applyPageSizeBtn, SIGNAL(clicked()), this, SLOT(showApplyPageSizeDialog()));
   for (const auto& kv : m_alignmentByButton) {
     CONNECT(kv.first, SIGNAL(clicked()), this, SLOT(alignmentButtonClicked()));
   }
