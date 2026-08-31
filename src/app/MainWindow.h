@@ -279,6 +279,8 @@ class MainWindow : public QMainWindow, private FilterUiInterface, private Ui::Ma
 
   bool saveProjectWithFeedback(const QString& projectFile);
 
+  bool preserveLegacyProjectIfNeeded(const QString& targetFile);
+
   void showInsertFileDialog(BeforeOrAfter beforeOrAfter, const ImageId& existing);
 
   void showRemovePagesDialog(const std::set<PageId>& pages);
@@ -319,6 +321,7 @@ class MainWindow : public QMainWindow, private FilterUiInterface, private Ui::Ma
   std::shared_ptr<ProjectPages> m_pages;
   std::shared_ptr<StageSequence> m_stages;
   QString m_projectFile;
+  int m_projectVersion;
   OutputFileNameGenerator m_outFileNameGen;
   std::shared_ptr<ThumbnailPixmapCache> m_thumbnailCache;
   std::unique_ptr<ThumbnailSequence> m_thumbSequence;

@@ -9,6 +9,7 @@ set(sources
     TestPageId.cpp
     TestPageRange.cpp
     TestPageSequence.cpp
+    TestProjectReaderCompatibility.cpp
     TestSelectContentApply.cpp
     TestSmartFilenameOrdering.cpp
     TestUnits.cpp)

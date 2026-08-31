@@ -8,6 +8,7 @@
 
 #include <QActionGroup>
 #include <QDir>
+#include <QFile>
 #include <QFileDialog>
 #include <QFileSystemModel>
 #include <QMenu>
@@ -103,6 +104,7 @@ class MainWindow::PageSelectionProviderImpl : public PageSelectionProvider {
 MainWindow::MainWindow()
     : m_pages(std::make_shared<ProjectPages>()),
       m_stages(std::make_shared<StageSequence>(m_pages, newPageSelectionAccessor())),
+      m_projectVersion(PROJECT_VERSION),
       m_workerThreadPool(std::make_unique<WorkerThreadPool>()),
       m_interactiveQueue(std::make_unique<ProcessingTaskQueue>()),
       m_outOfMemoryDialog(std::make_unique<OutOfMemoryDialog>()),
@@ -381,6 +383,7 @@ void MainWindow::switchToNewProject(const std::shared_ptr<ProjectPages>& pages,
   }
   m_pages = pages;
   m_projectFile = projectFilePath;
+  m_projectVersion = projectReader ? projectReader->getVersion().toInt() : PROJECT_VERSION;
 
   if (projectReader) {
     m_selectedPage = projectReader->selectedPage();
@@ -1789,10 +1792,15 @@ bool MainWindow::closeProjectInteractive() {
 
   switch (promptProjectSave()) {
     case SAVE:
+      if (!preserveLegacyProjectIfNeeded(m_projectFile)) {
+        QFile::remove(backupFilePath);
+        return false;
+      }
       if (!Utils::overwritingRename(backupFilePath, m_projectFile)) {
         QMessageBox::warning(this, tr("Error"), tr("Error saving the project file!"));
         return false;
       }
+      m_projectVersion = PROJECT_VERSION;
       // fall through
     case DONT_SAVE:
       QFile::remove(backupFilePath);
@@ -1811,10 +1819,55 @@ void MainWindow::closeProjectWithoutSaving() {
 }
 
 bool MainWindow::saveProjectWithFeedback(const QString& projectFile) {
+  if (!preserveLegacyProjectIfNeeded(projectFile)) {
+    return false;
+  }
+
   ProjectWriter writer(m_pages, m_selectedPage, m_outFileNameGen);
 
   if (!writer.write(projectFile, m_stages->filters())) {
     QMessageBox::warning(this, tr("Error"), tr("Error saving the project file!"));
+    return false;
+  }
+  m_projectVersion = PROJECT_VERSION;
+  return true;
+}
+
+bool MainWindow::preserveLegacyProjectIfNeeded(const QString& targetFile) {
+  if ((m_projectVersion >= PROJECT_VERSION) || m_projectFile.isEmpty()) {
+    return true;
+  }
+
+  const QString currentPath = QFileInfo(m_projectFile).absoluteFilePath();
+  const QString targetPath = QFileInfo(targetFile).absoluteFilePath();
+  if (currentPath.compare(targetPath, Qt::CaseInsensitive) != 0) {
+    // Save As already preserves the original legacy project.
+    return true;
+  }
+
+  const QFileInfo sourceInfo(currentPath);
+  if (!sourceInfo.exists()) {
+    return true;
+  }
+
+  const QString backupStem = QString::fromLatin1("Original-v%1").arg(m_projectVersion);
+  QString backupPath = sourceInfo.dir().absoluteFilePath(
+      QString::fromLatin1("%1.%2").arg(backupStem).arg(sourceInfo.fileName()));
+  if (QFileInfo::exists(backupPath)) {
+    if (compareFiles(currentPath, backupPath)) {
+      return true;
+    }
+    for (int suffix = 2; QFileInfo::exists(backupPath); ++suffix) {
+      backupPath = sourceInfo.dir().absoluteFilePath(
+          QString::fromLatin1("%1-%2.%3").arg(backupStem).arg(suffix).arg(sourceInfo.fileName()));
+    }
+  }
+
+  if (!QFile::copy(currentPath, backupPath)) {
+    QMessageBox::warning(
+        this, tr("Error"),
+        tr("Unable to create a safety copy of the version %1 project. The original project was not overwritten.")
+            .arg(m_projectVersion));
     return false;
   }
   return true;

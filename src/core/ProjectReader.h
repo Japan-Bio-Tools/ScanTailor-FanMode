@@ -30,6 +30,9 @@ class ProjectReader {
 
   ~ProjectReader();
 
+  /** Returns whether this project format can be read and safely upgraded. */
+  static bool isVersionCompatible(const QString& version);
+
   void readFilterSettings(const std::vector<FilterPtr>& filters) const;
 
   bool success() const { return (m_pages != nullptr); }
