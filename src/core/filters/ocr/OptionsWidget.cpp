@@ -20,6 +20,7 @@
 #include <QTemporaryDir>
 
 #include "AbstractRelinker.h"
+#include "InputFileStager.h"
 #include "PageSequence.h"
 #include "ProjectPages.h"
 #include "RtlPdfFixer.h"
@@ -285,6 +286,18 @@ void OptionsWidget::exportPdf() {
     return;
   }
 
+  // Leptonica's Windows file reader cannot reliably open non-ASCII paths.
+  // Give Tesseract ASCII-only aliases inside our temporary directory.  On
+  // Windows these are hard links when possible, so even large books do not
+  // need to be copied; other filesystems fall back to a normal copy.
+  QStringList stagedFiles;
+  QString stagingError;
+  const QString stagedDirectory = QDir(temporaryDirectory.path()).filePath(QStringLiteral("ocr-input"));
+  if (!InputFileStager::stage(files, stagedDirectory, &stagedFiles, &stagingError)) {
+    QMessageBox::warning(this, tr("OCR & PDF Export Failed"), stagingError);
+    return;
+  }
+
   const QString imageListPath = QDir(temporaryDirectory.path()).filePath(QStringLiteral("pages.txt"));
   QFile imageListFile(imageListPath);
   if (!imageListFile.open(QIODevice::WriteOnly)) {
@@ -292,7 +305,7 @@ void OptionsWidget::exportPdf() {
     return;
   }
   QByteArray imageListData;
-  for (const QString& filePath : files) {
+  for (const QString& filePath : stagedFiles) {
     imageListData.append(QDir::toNativeSeparators(filePath).toUtf8());
     imageListData.append('\n');
   }
@@ -323,7 +336,7 @@ void OptionsWidget::exportPdf() {
                         QStringLiteral("pdf"),
                         QStringLiteral("tsv")});
 
-  const int pageCount = static_cast<int>(files.size());
+  const int pageCount = static_cast<int>(stagedFiles.size());
   QProgressDialog progress(tr("Recognizing page 1 of %1...").arg(pageCount), tr("Cancel"), 0, pageCount, this);
   progress.setWindowTitle(tr("OCR & PDF Export"));
   progress.setWindowModality(Qt::WindowModal);
