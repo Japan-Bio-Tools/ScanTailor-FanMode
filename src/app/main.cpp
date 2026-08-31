@@ -17,6 +17,12 @@
 #include "MainWindow.h"
 
 int main(int argc, char* argv[]) {
+#if defined(Q_OS_WIN) && QT_VERSION_MAJOR >= 6
+  // ScanTailor Advanced's Qt 5 runtime rounds Windows scale factors to whole
+  // numbers. Keep that behavior so panels and controls have the same physical
+  // size on fractional-DPI displays (125%, 150%, and so on).
+  QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::Round);
+#endif
 #if QT_VERSION_MAJOR == 5
   // Issue #97: Qt5 on Wayland can corrupt dialogs; use X11 unless opted out.
   if (!qEnvironmentVariableIsSet("SCANTAILOR_NO_XCB_FALLBACK")) {
