@@ -17,7 +17,8 @@ StageSequence::StageSequence(const std::shared_ptr<ProjectPages>& pages,
           [outputFilter = std::weak_ptr<output::Filter>(m_outputFilter)]() {
             const std::shared_ptr<output::Filter> filter = outputFilter.lock();
             return filter ? filter->frontCoverPageId() : PageId();
-          })) {
+          })),
+      m_ocrFilter(std::make_shared<ocr::Filter>(pages, m_outputFilter)) {
   m_fixOrientationFilterIdx = static_cast<int>(m_filters.size());
   m_filters.emplace_back(m_fixOrientationFilter);
 
@@ -35,6 +36,9 @@ StageSequence::StageSequence(const std::shared_ptr<ProjectPages>& pages,
 
   m_outputFilterIdx = static_cast<int>(m_filters.size());
   m_filters.emplace_back(m_outputFilter);
+
+  m_ocrFilterIdx = static_cast<int>(m_filters.size());
+  m_filters.emplace_back(m_ocrFilter);
 }
 
 void StageSequence::performRelinking(const AbstractRelinker& relinker) {

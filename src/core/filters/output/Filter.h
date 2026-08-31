@@ -21,6 +21,10 @@ class ThumbnailPixmapCache;
 class OutputFileNameGenerator;
 class QString;
 
+namespace ocr {
+class Task;
+}
+
 namespace output {
 class OptionsWidget;
 class Task;
@@ -53,6 +57,7 @@ class Filter : public AbstractFilter {
   std::shared_ptr<Task> createTask(const PageId& pageId,
                                    std::shared_ptr<ThumbnailPixmapCache> thumbnailCache,
                                    const OutputFileNameGenerator& outFileNameGen,
+                                   std::shared_ptr<ocr::Task> nextTask,
                                    bool batch,
                                    bool debug);
 
@@ -61,6 +66,8 @@ class Filter : public AbstractFilter {
   OptionsWidget* optionsWidget();
 
   PageId frontCoverPageId() const;
+
+  PageId backCoverPageId() const;
 
   std::vector<PageOrderOption> pageOrderOptions() const override;
 

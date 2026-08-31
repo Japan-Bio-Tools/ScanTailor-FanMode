@@ -136,6 +136,7 @@ void Filter::loadSettings(const ProjectReader& reader, const QDomElement& filter
 std::shared_ptr<Task> Filter::createTask(const PageId& pageId,
                                          std::shared_ptr<ThumbnailPixmapCache> thumbnailCache,
                                          const OutputFileNameGenerator& outFileNameGen,
+                                         std::shared_ptr<ocr::Task> nextTask,
                                          const bool batch,
                                          const bool debug) {
   ImageViewTab lastTab(TAB_OUTPUT);
@@ -143,7 +144,8 @@ std::shared_ptr<Task> Filter::createTask(const PageId& pageId,
     lastTab = m_optionsWidget->lastTab();
   }
   return std::make_shared<Task>(std::static_pointer_cast<Filter>(shared_from_this()), m_settings,
-                                std::move(thumbnailCache), pageId, outFileNameGen, lastTab, batch, debug);
+                                std::move(thumbnailCache), pageId, outFileNameGen, std::move(nextTask), lastTab,
+                                batch, debug);
 }
 
 std::shared_ptr<CacheDrivenTask> Filter::createCacheDrivenTask(const OutputFileNameGenerator& outFileNameGen) {
@@ -163,6 +165,10 @@ OptionsWidget* Filter::optionsWidget() {
 
 PageId Filter::frontCoverPageId() const {
   return m_settings->coverPageId(CoverRole::FRONT);
+}
+
+PageId Filter::backCoverPageId() const {
+  return m_settings->coverPageId(CoverRole::BACK);
 }
 
 std::vector<PageOrderOption> Filter::pageOrderOptions() const {

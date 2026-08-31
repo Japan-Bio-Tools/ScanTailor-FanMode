@@ -68,6 +68,7 @@
 #include "filters/deskew/Task.h"
 #include "filters/fix_orientation/CacheDrivenTask.h"
 #include "filters/fix_orientation/Task.h"
+#include "filters/ocr/Task.h"
 #include "filters/output/CacheDrivenTask.h"
 #include "filters/output/TabbedImageView.h"
 #include "filters/output/Task.h"
@@ -405,6 +406,7 @@ void MainWindow::switchToNewProject(const std::shared_ptr<ProjectPages>& pages,
   if (projectReader) {
     projectReader->readFilterSettings(m_stages->filters());
   }
+  m_stages->ocrFilter()->setExportContext(m_outFileNameGen, m_projectFile);
 
   // Connect the filter list model to the view and select
   // the first item.
@@ -1445,6 +1447,7 @@ void MainWindow::saveProjectAsTriggered() {
 
   if (saveProjectWithFeedback(projectFile)) {
     m_projectFile = projectFile;
+    m_stages->ocrFilter()->setExportContext(m_outFileNameGen, m_projectFile);
     updateWindowTitle();
 
     QSettings settings;
@@ -1691,7 +1694,7 @@ void MainWindow::loadPageInteractive(const PageInfo& page) {
 
   m_interactiveQueue->cancelAndClear();
 
-  if (isOutputFilter() && !checkReadyForOutput(&page.id())) {
+  if ((m_curFilter >= m_stages->outputFilterIdx()) && !checkReadyForOutput(&page.id())) {
     filterList->setBatchProcessingPossible(false);
 
     const QString errText(
@@ -2126,13 +2129,18 @@ BackgroundTaskPtr MainWindow::createCompositeTask(const PageInfo& page,
   std::shared_ptr<select_content::Task> selectContentTask;
   std::shared_ptr<page_layout::Task> pageLayoutTask;
   std::shared_ptr<output::Task> outputTask;
+  std::shared_ptr<ocr::Task> ocrTask;
 
   if (batch) {
     debug = false;
   }
 
+  if (lastFilterIdx >= m_stages->ocrFilterIdx()) {
+    ocrTask = m_stages->ocrFilter()->createTask(page.id(), batch);
+  }
   if (lastFilterIdx >= m_stages->outputFilterIdx()) {
-    outputTask = m_stages->outputFilter()->createTask(page.id(), m_thumbnailCache, m_outFileNameGen, batch, debug);
+    outputTask = m_stages->outputFilter()->createTask(page.id(), m_thumbnailCache, m_outFileNameGen,
+                                                      std::move(ocrTask), batch, debug);
     debug = false;
   }
   if (lastFilterIdx >= m_stages->pageLayoutFilterIdx()) {

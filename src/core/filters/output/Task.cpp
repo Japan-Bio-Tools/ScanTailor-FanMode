@@ -39,6 +39,7 @@
 #include "TaskStatus.h"
 #include "ThumbnailPixmapCache.h"
 #include "Utils.h"
+#include "filters/ocr/Task.h"
 
 using namespace imageproc;
 using namespace dewarping;
@@ -111,6 +112,7 @@ Task::Task(std::shared_ptr<Filter> filter,
            std::shared_ptr<ThumbnailPixmapCache> thumbnailCache,
            const PageId& pageId,
            const OutputFileNameGenerator& outFileNameGen,
+           std::shared_ptr<ocr::Task> nextTask,
            const ImageViewTab lastTab,
            const bool batch,
            const bool debug)
@@ -119,6 +121,7 @@ Task::Task(std::shared_ptr<Filter> filter,
       m_thumbnailCache(std::move(thumbnailCache)),
       m_pageId(pageId),
       m_outFileNameGen(outFileNameGen),
+      m_nextTask(std::move(nextTask)),
       m_lastTab(lastTab),
       m_batchProcessing(batch),
       m_debug(debug) {
@@ -482,6 +485,9 @@ FilterResultPtr Task::process(const TaskStatus& status, const FilterData& data, 
   }
   const QRect displayContentRect
       = stretchCover ? QRect(QPoint(0, 0), outImg.size()) : generator.outputContentRect();
+  if (m_nextTask) {
+    return m_nextTask->process(status, outImg);
+  }
   return std::make_shared<UiUpdater>(m_filter, m_settings, std::move(m_dbg), params, newXform,
                                      displayContentRect, m_pageId, data.origImage(), outImg, automaskImg,
                                      despeckleState, despeckleVisualization, m_batchProcessing, m_debug);

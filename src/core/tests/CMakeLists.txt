@@ -3,6 +3,7 @@ set(sources
     TestContentSpanFinder.cpp
     TestDeskewParams.cpp
     TestObliqueFinder.cpp
+    TestOcrSettings.cpp
     TestOutputCover.cpp
     TestImageId.cpp
     TestMargins.cpp

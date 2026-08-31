@@ -28,6 +28,10 @@ namespace imageproc {
 class BinaryImage;
 }
 
+namespace ocr {
+class Task;
+}
+
 namespace output {
 class Filter;
 class Settings;
@@ -41,6 +45,7 @@ class Task {
        std::shared_ptr<ThumbnailPixmapCache> thumbnailCache,
        const PageId& pageId,
        const OutputFileNameGenerator& outFileNameGen,
+       std::shared_ptr<ocr::Task> nextTask,
        ImageViewTab lastTab,
        bool batch,
        bool debug);
@@ -60,6 +65,7 @@ class Task {
   std::unique_ptr<DebugImages> m_dbg;
   PageId m_pageId;
   OutputFileNameGenerator m_outFileNameGen;
+  std::shared_ptr<ocr::Task> m_nextTask;
   ImageViewTab m_lastTab;
   bool m_batchProcessing;
   bool m_debug;

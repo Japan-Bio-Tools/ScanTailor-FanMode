@@ -11,6 +11,7 @@
 #include "NonCopyable.h"
 #include "filters/deskew/Filter.h"
 #include "filters/fix_orientation/Filter.h"
+#include "filters/ocr/Filter.h"
 #include "filters/output/Filter.h"
 #include "filters/page_layout/Filter.h"
 #include "filters/page_split/Filter.h"
@@ -53,6 +54,8 @@ class StageSequence {
 
   const std::shared_ptr<output::Filter>& outputFilter() const { return m_outputFilter; }
 
+  const std::shared_ptr<ocr::Filter>& ocrFilter() const { return m_ocrFilter; }
+
   int fixOrientationFilterIdx() const { return m_fixOrientationFilterIdx; }
 
   int pageSplitFilterIdx() const { return m_pageSplitFilterIdx; }
@@ -65,6 +68,8 @@ class StageSequence {
 
   int outputFilterIdx() const { return m_outputFilterIdx; }
 
+  int ocrFilterIdx() const { return m_ocrFilterIdx; }
+
  private:
   std::shared_ptr<fix_orientation::Filter> m_fixOrientationFilter;
   std::shared_ptr<page_split::Filter> m_pageSplitFilter;
@@ -72,6 +77,7 @@ class StageSequence {
   std::shared_ptr<select_content::Filter> m_selectContentFilter;
   std::shared_ptr<output::Filter> m_outputFilter;
   std::shared_ptr<page_layout::Filter> m_pageLayoutFilter;
+  std::shared_ptr<ocr::Filter> m_ocrFilter;
   std::vector<FilterPtr> m_filters;
   int m_fixOrientationFilterIdx;
   int m_pageSplitFilterIdx;
@@ -79,6 +85,7 @@ class StageSequence {
   int m_selectContentFilterIdx;
   int m_pageLayoutFilterIdx;
   int m_outputFilterIdx;
+  int m_ocrFilterIdx;
 };
 
 

@@ -94,6 +94,30 @@ else()
   message(WARNING "pdftoppm was not found; Convert PDF will require it on PATH at runtime")
 endif()
 
+find_program(SCANTAILOR_TESSERACT_EXECUTABLE NAMES tesseract tesseract.exe)
+if (SCANTAILOR_TESSERACT_EXECUTABLE)
+  get_filename_component(SCANTAILOR_TESSERACT_BIN_DIR "${SCANTAILOR_TESSERACT_EXECUTABLE}" DIRECTORY)
+  get_filename_component(SCANTAILOR_TESSERACT_PREFIX "${SCANTAILOR_TESSERACT_BIN_DIR}" DIRECTORY)
+  set(SCANTAILOR_TESSDATA_DIR "${SCANTAILOR_TESSERACT_PREFIX}/share/tessdata")
+  if (EXISTS "${SCANTAILOR_TESSDATA_DIR}/ara.traineddata" AND
+      EXISTS "${SCANTAILOR_TESSDATA_DIR}/eng.traineddata")
+    add_custom_command(
+        TARGET ${target_name}
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${SCANTAILOR_TESSERACT_EXECUTABLE}"
+                "$<TARGET_FILE_DIR:${target_name}>"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${SCANTAILOR_TESSDATA_DIR}"
+                "$<TARGET_FILE_DIR:${target_name}>/tessdata"
+        COMMENT "bundle the Arabic and English OCR engine")
+  else()
+    message(WARNING "Tesseract Arabic or English language data was not found")
+  endif()
+else()
+  message(WARNING "Tesseract was not found; OCR & PDF export will be unavailable")
+endif()
+
 if (Qt6_FOUND AND WIN32)
   #manage plugins with windeployqt.
   add_custom_command(

@@ -16,8 +16,12 @@ $ucrtRoot = Join-Path $msysRoot 'ucrt64'
 $ucrtBin = Join-Path $ucrtRoot 'bin'
 $objdump = Join-Path $ucrtBin 'objdump.exe'
 $pdfConverter = Join-Path $buildDir 'pdftoppm.exe'
+$ocrEngine = Join-Path $buildDir 'tesseract.exe'
+$tessdata = Join-Path $buildDir 'tessdata'
 $popplerData = Join-Path $ucrtRoot 'share\poppler'
 $popplerDataLicenses = Join-Path $ucrtRoot 'share\licenses\poppler-data'
+$tesseractLicenses = Join-Path $ucrtRoot 'share\licenses\tesseract-ocr'
+$leptonicaLicenses = Join-Path $ucrtRoot 'share\licenses\leptonica'
 
 if (-not (Test-Path -LiteralPath $executable)) {
     throw "Build FanMode before packaging. Missing executable: $executable"
@@ -27,6 +31,13 @@ if (-not (Test-Path -LiteralPath $objdump)) {
 }
 if (-not (Test-Path -LiteralPath $pdfConverter)) {
     throw "Bundled PDF converter was not found: $pdfConverter"
+}
+if (-not (Test-Path -LiteralPath $ocrEngine)) {
+    throw "Bundled OCR engine was not found: $ocrEngine"
+}
+if (-not (Test-Path -LiteralPath (Join-Path $tessdata 'ara.traineddata')) -or
+    -not (Test-Path -LiteralPath (Join-Path $tessdata 'eng.traineddata'))) {
+    throw "Bundled Arabic and English OCR data was not found: $tessdata"
 }
 if (-not (Test-Path -LiteralPath $popplerData)) {
     throw "Poppler encoding data was not found: $popplerData"
@@ -47,6 +58,8 @@ New-Item -ItemType Directory -Path $resolvedPackage -Force | Out-Null
 
 Copy-Item -LiteralPath $executable -Destination $resolvedPackage
 Copy-Item -LiteralPath $pdfConverter -Destination $resolvedPackage
+Copy-Item -LiteralPath $ocrEngine -Destination $resolvedPackage
+Copy-Item -LiteralPath $tessdata -Destination $resolvedPackage -Recurse
 Get-ChildItem -LiteralPath $buildDir -Filter '*.dll' -File | Copy-Item -Destination $resolvedPackage
 Get-ChildItem -LiteralPath $buildDir -Filter 'scantailor-advanced_*.qm' -File |
     Copy-Item -Destination $resolvedPackage
@@ -61,10 +74,16 @@ foreach ($pluginDir in @('generic', 'iconengines', 'imageformats', 'networkinfor
 $packageShareDir = Join-Path $resolvedPackage 'share'
 New-Item -ItemType Directory -Path $packageShareDir -Force | Out-Null
 Copy-Item -LiteralPath $popplerData -Destination $packageShareDir -Recurse
+$thirdPartyLicenses = Join-Path $resolvedPackage 'THIRD-PARTY-LICENSES'
+New-Item -ItemType Directory -Path $thirdPartyLicenses -Force | Out-Null
 if (Test-Path -LiteralPath $popplerDataLicenses) {
-    $thirdPartyLicenses = Join-Path $resolvedPackage 'THIRD-PARTY-LICENSES'
-    New-Item -ItemType Directory -Path $thirdPartyLicenses -Force | Out-Null
     Copy-Item -LiteralPath $popplerDataLicenses -Destination $thirdPartyLicenses -Recurse
+}
+if (Test-Path -LiteralPath $tesseractLicenses) {
+    Copy-Item -LiteralPath $tesseractLicenses -Destination $thirdPartyLicenses -Recurse
+}
+if (Test-Path -LiteralPath $leptonicaLicenses) {
+    Copy-Item -LiteralPath $leptonicaLicenses -Destination $thirdPartyLicenses -Recurse
 }
 
 # Copy every non-system MinGW dependency, including dependencies of plugins.
@@ -104,6 +123,7 @@ $buildInfo = @(
     "FanMode version: $Version"
     'Architecture: x64'
     'PDF import: Poppler pdftoppm with lossless LZW TIFF output'
+    'Searchable PDF export: Tesseract OCR with bundled Arabic and English data'
     'License: GNU GPL version 3 (see LICENSE.txt)'
 )
 $buildInfo | Set-Content -LiteralPath (Join-Path $resolvedPackage 'BUILD-INFO.txt') -Encoding UTF8

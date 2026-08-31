@@ -1,6 +1,7 @@
 set(CMAKE_AUTOUIC ON)
 
 set(ui_files
+    ../ocr/OcrOptionsWidget.ui
     ApplyColorsDialog.ui
     ChangeDewarpingDialog.ui
     ChangeDpiDialog.ui
@@ -11,6 +12,10 @@ set(ui_files
     PictureZonePropDialog.ui)
 
 set(sources
+    ../ocr/Filter.cpp ../ocr/Filter.h
+    ../ocr/OptionsWidget.cpp ../ocr/OptionsWidget.h
+    ../ocr/Settings.cpp ../ocr/Settings.h
+    ../ocr/Task.cpp ../ocr/Task.h
     ApplyColorsDialog.cpp ApplyColorsDialog.h
     ChangeDpiDialog.cpp ChangeDpiDialog.h
     ImageView.cpp ImageView.h

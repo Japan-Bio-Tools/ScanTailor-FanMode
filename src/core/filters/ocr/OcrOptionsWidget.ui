@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>OcrOptionsWidget</class>
+ <widget class="QWidget" name="OcrOptionsWidget">
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <property name="leftMargin"><number>6</number></property>
+   <property name="topMargin"><number>6</number></property>
+   <property name="rightMargin"><number>6</number></property>
+   <item>
+    <widget class="QLabel" name="titleLabel">
+     <property name="font"><font><bold>true</bold></font></property>
+     <property name="text"><string>SEARCHABLE PDF</string></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="languagesGroup">
+     <property name="title"><string>OCR Languages</string></property>
+     <layout class="QVBoxLayout" name="languagesLayout">
+      <item><widget class="QCheckBox" name="arabicCheckBox"><property name="text"><string>Arabic</string></property></widget></item>
+      <item><widget class="QCheckBox" name="englishCheckBox"><property name="text"><string>English</string></property></widget></item>
+      <item>
+       <widget class="QLabel" name="languageHelpLabel">
+        <property name="text"><string>Select both for bilingual books. The project reading direction automatically chooses the primary language.</string></property>
+        <property name="wordWrap"><bool>true</bool></property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="compressionGroup">
+     <property name="title"><string>PDF Compression</string></property>
+     <layout class="QVBoxLayout" name="compressionLayout">
+      <item><widget class="QComboBox" name="compressionCombo"/></item>
+      <item>
+       <widget class="QLabel" name="compressionHelpLabel">
+        <property name="text"><string>Balanced is recommended for most scanned books. Compression changes the PDF only; final TIFF pages remain unchanged.</string></property>
+        <property name="wordWrap"><bool>true</bool></property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="estimateLabel">
+     <property name="font"><font><bold>true</bold></font></property>
+     <property name="text"><string>Estimated PDF size</string></property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item><widget class="QPushButton" name="exportPdfButton"><property name="text"><string>Export Searchable PDF...</string></property></widget></item>
+   <item><widget class="QLabel" name="lastExportLabel"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+   <item>
+    <spacer name="verticalSpacer">
+     <property name="orientation"><enum>Qt::Vertical</enum></property>
+     <property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property>
+    </spacer>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
