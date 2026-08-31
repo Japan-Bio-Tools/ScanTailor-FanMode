@@ -66,6 +66,12 @@ class OptionsWidget : public FilterOptionsWidget, private Ui::OptionsWidget {
 
   void changeDpiButtonClicked();
 
+  void frontCoverToggled(bool checked);
+
+  void backCoverToggled(bool checked);
+
+  void stretchCoverToggled(bool checked);
+
   void applyColorsButtonClicked();
 
   void applySplittingButtonClicked();
@@ -171,6 +177,8 @@ class OptionsWidget : public FilterOptionsWidget, private Ui::OptionsWidget {
 
   void updateDpiDisplay();
 
+  void updateCoverDisplay();
+
   void updateColorsDisplay();
 
   void updateDewarpingDisplay();
@@ -191,6 +199,8 @@ class OptionsWidget : public FilterOptionsWidget, private Ui::OptionsWidget {
   DepthPerception m_depthPerception;
   DewarpingOptions m_dewarpingOptions;
   double m_despeckleLevel;
+  CoverRole m_coverRole;
+  bool m_stretchCover;
   ImageViewTab m_lastTab;
   QTimer m_delayedReloadRequest;
 

@@ -140,6 +140,8 @@ class MainWindow : public QMainWindow, private FilterUiInterface, private Ui::Ma
 
   void pageOrderingChanged(int idx);
 
+  void refreshPageOrdering();
+
   void reloadRequested();
 
   void startBatchProcessing();

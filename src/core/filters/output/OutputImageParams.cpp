@@ -25,7 +25,8 @@ OutputImageParams::OutputImageParams(const QSize& outImageSize,
                                      const double despeckleLevel,
                                      const PictureShapeOptions& pictureShapeOptions,
                                      const OutputProcessingParams& outputProcessingParams,
-                                     bool isBlackOnWhite)
+                                     const bool isBlackOnWhite,
+                                     const bool stretchCover)
     : m_size(outImageSize),
       m_contentRect(contentRect),
       m_cropArea(xform.resultingPreCropArea()),
@@ -38,7 +39,8 @@ OutputImageParams::OutputImageParams(const QSize& outImageSize,
       m_dewarpingOptions(dewarpingOptions),
       m_despeckleLevel(despeckleLevel),
       m_outputProcessingParams(outputProcessingParams),
-      m_blackOnWhite(isBlackOnWhite) {
+      m_blackOnWhite(isBlackOnWhite),
+      m_stretchCover(stretchCover) {
   // For historical reasons, we disregard post-cropping and post-scaling here.
   xform.setPostCropArea(QPolygonF());  // Resets post-scale as well.
   m_partialXform = xform.transform();
@@ -58,7 +60,8 @@ OutputImageParams::OutputImageParams(const QDomElement& el)
       m_dewarpingOptions(el.namedItem("dewarping-options").toElement()),
       m_despeckleLevel(el.attribute("despeckleLevel").toDouble()),
       m_outputProcessingParams(el.namedItem("processing-params").toElement()),
-      m_blackOnWhite(el.attribute("blackOnWhite") == "1") {}
+      m_blackOnWhite(el.attribute("blackOnWhite") == "1"),
+      m_stretchCover(el.attribute("stretchCover") == "1") {}
 
 QDomElement OutputImageParams::toXml(QDomDocument& doc, const QString& name) const {
   XmlMarshaller marshaller(doc);
@@ -78,6 +81,7 @@ QDomElement OutputImageParams::toXml(QDomDocument& doc, const QString& name) con
   el.setAttribute("despeckleLevel", Utils::doubleToString(m_despeckleLevel));
   el.appendChild(m_outputProcessingParams.toXml(doc, "processing-params"));
   el.setAttribute("blackOnWhite", m_blackOnWhite ? "1" : "0");
+  el.setAttribute("stretchCover", m_stretchCover ? "1" : "0");
   return el;
 }
 
@@ -127,6 +131,9 @@ bool OutputImageParams::matches(const OutputImageParams& other) const {
   }
 
   if (m_blackOnWhite != other.m_blackOnWhite) {
+    return false;
+  }
+  if (m_stretchCover != other.m_stretchCover) {
     return false;
   }
   return true;

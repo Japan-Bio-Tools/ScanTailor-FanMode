@@ -10,7 +10,25 @@
 using namespace foundation;
 
 namespace output {
-Params::Params() : m_dpi(600, 600), m_despeckleLevel(1.0), m_blackOnWhite(true) {}
+namespace {
+CoverRole coverRoleFromXml(const QDomElement& el) {
+  const int value = el.attribute("coverRole", "0").toInt();
+  if (value == static_cast<int>(CoverRole::FRONT)) {
+    return CoverRole::FRONT;
+  }
+  if (value == static_cast<int>(CoverRole::BACK)) {
+    return CoverRole::BACK;
+  }
+  return CoverRole::NONE;
+}
+}  // namespace
+
+Params::Params()
+    : m_dpi(600, 600),
+      m_despeckleLevel(1.0),
+      m_blackOnWhite(true),
+      m_coverRole(CoverRole::NONE),
+      m_stretchCover(false) {}
 
 Params::Params(const Dpi& dpi,
                const ColorParams& colorParams,
@@ -28,7 +46,9 @@ Params::Params(const Dpi& dpi,
       m_depthPerception(depthPerception),
       m_dewarpingOptions(dewarpingOptions),
       m_despeckleLevel(despeckleLevel),
-      m_blackOnWhite(true) {}
+      m_blackOnWhite(true),
+      m_coverRole(CoverRole::NONE),
+      m_stretchCover(false) {}
 
 Params::Params(const QDomElement& el)
     : m_dpi(el.namedItem("dpi").toElement()),
@@ -39,7 +59,9 @@ Params::Params(const QDomElement& el)
       m_depthPerception(el.attribute("depthPerception")),
       m_dewarpingOptions(el.namedItem("dewarping-options").toElement()),
       m_despeckleLevel(el.attribute("despeckleLevel").toDouble()),
-      m_blackOnWhite(el.attribute("blackOnWhite") == "1") {}
+      m_blackOnWhite(el.attribute("blackOnWhite") == "1"),
+      m_coverRole(coverRoleFromXml(el)),
+      m_stretchCover(el.attribute("stretchCover") == "1") {}
 
 QDomElement Params::toXml(QDomDocument& doc, const QString& name) const {
   XmlMarshaller marshaller(doc);
@@ -54,6 +76,8 @@ QDomElement Params::toXml(QDomDocument& doc, const QString& name) const {
   el.appendChild(m_colorParams.toXml(doc, "color-params"));
   el.appendChild(m_splittingOptions.toXml(doc, "splitting"));
   el.setAttribute("blackOnWhite", m_blackOnWhite ? "1" : "0");
+  el.setAttribute("coverRole", static_cast<int>(m_coverRole));
+  el.setAttribute("stretchCover", m_stretchCover ? "1" : "0");
   return el;
 }
 }  // namespace output

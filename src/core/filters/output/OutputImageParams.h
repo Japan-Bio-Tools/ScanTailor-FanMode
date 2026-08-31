@@ -41,7 +41,8 @@ class OutputImageParams {
                     double despeckleLevel,
                     const PictureShapeOptions& pictureShapeOptions,
                     const OutputProcessingParams& outputProcessingParams,
-                    bool isBlackOnWhite);
+                    bool isBlackOnWhite,
+                    bool stretchCover);
 
   explicit OutputImageParams(const QDomElement& el);
 
@@ -145,6 +146,9 @@ class OutputImageParams {
 
   /** Whether the page has dark content on light background */
   bool m_blackOnWhite;
+
+  /** Whether selected cover content was stretched over the full output page. */
+  bool m_stretchCover;
 };
 
 

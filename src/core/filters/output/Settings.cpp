@@ -318,4 +318,40 @@ void Settings::setBlackOnWhite(const PageId& pageId, const bool blackOnWhite) {
     it->second.setBlackOnWhite(blackOnWhite);
   }
 }
+
+void Settings::setCoverRole(const PageId& pageId, const CoverRole role) {
+  const QMutexLocker locker(&m_mutex);
+
+  // A project may contain at most one front cover and one back cover.
+  // Assigning a role to another page automatically releases the old page.
+  if (role != CoverRole::NONE) {
+    for (auto& entry : m_perPageParams) {
+      if ((entry.first != pageId) && (entry.second.coverRole() == role)) {
+        entry.second.setCoverRole(CoverRole::NONE);
+      }
+    }
+  }
+
+  auto it = m_perPageParams.find(pageId);
+  if (it == m_perPageParams.end()) {
+    Params params;
+    params.setCoverRole(role);
+    m_perPageParams.emplace(pageId, params);
+  } else {
+    it->second.setCoverRole(role);
+  }
+}
+
+void Settings::setStretchCover(const PageId& pageId, const bool stretch) {
+  const QMutexLocker locker(&m_mutex);
+
+  auto it = m_perPageParams.find(pageId);
+  if (it == m_perPageParams.end()) {
+    Params params;
+    params.setStretchCover(stretch);
+    m_perPageParams.emplace(pageId, params);
+  } else {
+    it->second.setStretchCover(stretch);
+  }
+}
 }  // namespace output

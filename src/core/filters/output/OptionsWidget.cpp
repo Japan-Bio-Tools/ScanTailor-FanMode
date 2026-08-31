@@ -4,6 +4,7 @@
 #include "OptionsWidget.h"
 
 #include <QToolTip>
+#include <QSignalBlocker>
 #include <utility>
 
 #include "../../Utils.h"
@@ -23,6 +24,8 @@ OptionsWidget::OptionsWidget(std::shared_ptr<Settings> settings, const PageSelec
     : m_settings(std::move(settings)),
       m_pageSelectionAccessor(pageSelectionAccessor),
       m_despeckleLevel(1.0),
+      m_coverRole(CoverRole::NONE),
+      m_stretchCover(false),
       m_lastTab(TAB_OUTPUT),
       m_connectionManager(std::bind(&OptionsWidget::setupUiConnections, this)) {
   setupUi(this);
@@ -104,8 +107,11 @@ void OptionsWidget::preUpdateUI(const PageId& pageId) {
   m_dewarpingOptions = params.dewarpingOptions();
   m_depthPerception = params.depthPerception();
   m_despeckleLevel = params.despeckleLevel();
+  m_coverRole = params.coverRole();
+  m_stretchCover = params.stretchCover();
 
   updateDpiDisplay();
+  updateCoverDisplay();
   updateColorsDisplay();
   updateDewarpingDisplay();
   updateProcessingDisplay();
@@ -141,6 +147,56 @@ void OptionsWidget::colorModeChanged(const int idx) {
   m_settings->setColorParams(m_pageId, m_colorParams);
   updateColorsDisplay();
   emit reloadRequested();
+}
+
+void OptionsWidget::frontCoverToggled(const bool checked) {
+  if (checked) {
+    m_coverRole = CoverRole::FRONT;
+  } else if (m_coverRole == CoverRole::FRONT) {
+    m_coverRole = CoverRole::NONE;
+    m_stretchCover = false;
+    m_settings->setStretchCover(m_pageId, false);
+  }
+
+  m_settings->setCoverRole(m_pageId, m_coverRole);
+  updateCoverDisplay();
+  emit pageOrderChanged();
+  emit invalidateAllThumbnails();
+  emit reloadRequested();
+}
+
+void OptionsWidget::backCoverToggled(const bool checked) {
+  if (checked) {
+    m_coverRole = CoverRole::BACK;
+  } else if (m_coverRole == CoverRole::BACK) {
+    m_coverRole = CoverRole::NONE;
+    m_stretchCover = false;
+    m_settings->setStretchCover(m_pageId, false);
+  }
+
+  m_settings->setCoverRole(m_pageId, m_coverRole);
+  updateCoverDisplay();
+  emit pageOrderChanged();
+  emit invalidateAllThumbnails();
+  emit reloadRequested();
+}
+
+void OptionsWidget::stretchCoverToggled(const bool checked) {
+  m_stretchCover = checked;
+  m_settings->setStretchCover(m_pageId, checked);
+  updateCoverDisplay();
+  emit invalidateThumbnail(m_pageId);
+  emit reloadRequested();
+}
+
+void OptionsWidget::updateCoverDisplay() {
+  const QSignalBlocker frontBlocker(frontCoverCB);
+  const QSignalBlocker backBlocker(backCoverCB);
+  const QSignalBlocker stretchBlocker(stretchCoverCB);
+  frontCoverCB->setChecked(m_coverRole == CoverRole::FRONT);
+  backCoverCB->setChecked(m_coverRole == CoverRole::BACK);
+  stretchCoverCB->setEnabled(m_coverRole != CoverRole::NONE);
+  stretchCoverCB->setChecked((m_coverRole != CoverRole::NONE) && m_stretchCover);
 }
 
 void OptionsWidget::thresholdMethodChanged(int idx) {
@@ -950,6 +1006,9 @@ void OptionsWidget::sendReloadRequested() {
 
 void OptionsWidget::setupUiConnections() {
   CONNECT(changeDpiButton, SIGNAL(clicked()), this, SLOT(changeDpiButtonClicked()));
+  CONNECT(frontCoverCB, SIGNAL(clicked(bool)), this, SLOT(frontCoverToggled(bool)));
+  CONNECT(backCoverCB, SIGNAL(clicked(bool)), this, SLOT(backCoverToggled(bool)));
+  CONNECT(stretchCoverCB, SIGNAL(clicked(bool)), this, SLOT(stretchCoverToggled(bool)));
   CONNECT(colorModeSelector, SIGNAL(currentIndexChanged(int)), this, SLOT(colorModeChanged(int)));
   CONNECT(thresholdMethodBox, SIGNAL(currentIndexChanged(int)), this, SLOT(thresholdMethodChanged(int)));
   CONNECT(fillingColorBox, SIGNAL(currentIndexChanged(int)), this, SLOT(fillingColorChanged(int)));

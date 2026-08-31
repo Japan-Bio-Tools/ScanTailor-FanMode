@@ -59,6 +59,7 @@ set(sources
     OptionsWidgetBinarization.h 
     PictureShapeOptions.cpp PictureShapeOptions.h 
     OutputProcessingParams.cpp OutputProcessingParams.h
+    OrderByCoverProvider.cpp OrderByCoverProvider.h
     OutputImage.h
     OutputImageWithForeground.h
     OutputImageWithOriginalBackground.h

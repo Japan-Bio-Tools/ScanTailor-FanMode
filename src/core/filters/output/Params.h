@@ -17,6 +17,12 @@ class QDomDocument;
 class QDomElement;
 
 namespace output {
+enum class CoverRole {
+  NONE = 0,
+  FRONT = 1,
+  BACK = 2
+};
+
 class Params {
  public:
   Params();
@@ -70,6 +76,16 @@ class Params {
 
   void setBlackOnWhite(bool isBlackOnWhite);
 
+  CoverRole coverRole() const;
+
+  void setCoverRole(CoverRole role);
+
+  bool isCover() const;
+
+  bool stretchCover() const;
+
+  void setStretchCover(bool stretch);
+
  private:
   Dpi m_dpi;
   ColorParams m_colorParams;
@@ -80,6 +96,8 @@ class Params {
   DewarpingOptions m_dewarpingOptions;
   double m_despeckleLevel;
   bool m_blackOnWhite;
+  CoverRole m_coverRole;
+  bool m_stretchCover;
 };
 
 
@@ -153,6 +171,26 @@ inline bool Params::isBlackOnWhite() const {
 
 inline void Params::setBlackOnWhite(bool isBlackOnWhite) {
   Params::m_blackOnWhite = isBlackOnWhite;
+}
+
+inline CoverRole Params::coverRole() const {
+  return m_coverRole;
+}
+
+inline void Params::setCoverRole(const CoverRole role) {
+  m_coverRole = role;
+}
+
+inline bool Params::isCover() const {
+  return m_coverRole != CoverRole::NONE;
+}
+
+inline bool Params::stretchCover() const {
+  return m_stretchCover;
+}
+
+inline void Params::setStretchCover(const bool stretch) {
+  m_stretchCover = stretch;
 }
 }  // namespace output
 #endif  // ifndef SCANTAILOR_OUTPUT_PARAMS_H_

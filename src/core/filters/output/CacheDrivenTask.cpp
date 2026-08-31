@@ -66,7 +66,8 @@ void CacheDrivenTask::process(const PageInfo& pageInfo,
           generator.outputImageSize(), generator.outputContentRect(), newXform, params.outputDpi(),
           params.colorParams(), params.splittingOptions(), params.dewarpingOptions(), params.distortionModel(),
           params.depthPerception(), params.despeckleLevel(), params.pictureShapeOptions(),
-          m_settings->getOutputProcessingParams(pageInfo.id()), params.isBlackOnWhite());
+          m_settings->getOutputProcessingParams(pageInfo.id()), params.isBlackOnWhite(),
+          params.isCover() && params.stretchCover());
 
       if (!storedOutputParams->outputImageParams().matches(newOutputImageParams)) {
         needReprocess = true;

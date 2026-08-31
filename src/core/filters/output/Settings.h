@@ -93,6 +93,11 @@ class Settings {
 
   void setBlackOnWhite(const PageId& pageId, bool blackOnWhite);
 
+  /** Assigns a unique project-level cover role to a page. */
+  void setCoverRole(const PageId& pageId, CoverRole role);
+
+  void setStretchCover(const PageId& pageId, bool stretch);
+
  private:
   using PerPageParams = std::unordered_map<PageId, Params>;
   using PerPageOutputParams = std::unordered_map<PageId, OutputParams>;

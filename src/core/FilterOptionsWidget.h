@@ -28,6 +28,9 @@ class FilterOptionsWidget : public QWidget {
 
   void invalidateAllThumbnails();
 
+  /** Re-applies the active page ordering while keeping the current selection. */
+  void pageOrderChanged();
+
   /**
    * After we've got rid of "Widest Page" / "Tallest Page" links,
    * there is no one using this signal.  It's a candidate for removal.

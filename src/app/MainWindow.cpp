@@ -708,6 +708,7 @@ void MainWindow::setOptionsWidget(FilterOptionsWidget* widget, const Ownership o
     disconnect(m_optionsWidget, SIGNAL(invalidateThumbnail(const PageInfo&)), this,
                SLOT(invalidateThumbnail(const PageInfo&)));
     disconnect(m_optionsWidget, SIGNAL(invalidateAllThumbnails()), this, SLOT(invalidateAllThumbnails()));
+    disconnect(m_optionsWidget, SIGNAL(pageOrderChanged()), this, SLOT(refreshPageOrdering()));
     disconnect(m_optionsWidget, SIGNAL(goToPage(const PageId&)), this, SLOT(goToPage(const PageId&)));
     disconnect(m_optionsWidget, SIGNAL(fixDpiRequested()), this, SLOT(fixDpiDialogRequested()));
   }
@@ -723,6 +724,7 @@ void MainWindow::setOptionsWidget(FilterOptionsWidget* widget, const Ownership o
   connect(widget, SIGNAL(invalidateThumbnail(const PageId&)), this, SLOT(invalidateThumbnail(const PageId&)));
   connect(widget, SIGNAL(invalidateThumbnail(const PageInfo&)), this, SLOT(invalidateThumbnail(const PageInfo&)));
   connect(widget, SIGNAL(invalidateAllThumbnails()), this, SLOT(invalidateAllThumbnails()));
+  connect(widget, SIGNAL(pageOrderChanged()), this, SLOT(refreshPageOrdering()));
   connect(widget, SIGNAL(goToPage(const PageId&)), this, SLOT(goToPage(const PageId&)));
   connect(widget, SIGNAL(fixDpiRequested()), this, SLOT(fixDpiDialogRequested()));
 }  // MainWindow::setOptionsWidget
@@ -1209,6 +1211,10 @@ void MainWindow::pageOrderingChanged(int idx) {
     thumbView->horizontalScrollBar()->setValue(horScrollBarPos);
     thumbView->verticalScrollBar()->setValue(verScrollBarPos);
   }
+}
+
+void MainWindow::refreshPageOrdering() {
+  pageOrderingChanged(m_stages->filterAt(m_curFilter)->selectedPageOrder());
 }
 
 void MainWindow::reloadRequested() {

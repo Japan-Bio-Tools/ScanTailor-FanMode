@@ -10,6 +10,7 @@
 #include "CacheDrivenTask.h"
 #include "FilterUiInterface.h"
 #include "OptionsWidget.h"
+#include "OrderByCoverProvider.h"
 #include "ProjectReader.h"
 #include "ProjectWriter.h"
 #include "Settings.h"
@@ -22,10 +23,11 @@ Filter::Filter(const PageSelectionAccessor& pageSelectionAccessor)
     : m_settings(std::make_shared<Settings>()), m_selectedPageOrder(0) {
   m_optionsWidget.reset(new OptionsWidget(m_settings, pageSelectionAccessor));
 
-  const PageOrderOption::ProviderPtr defaultOrder;
   const auto orderByCompleteness = std::make_shared<OrderByCompletenessProvider>();
-  m_pageOrderOptions.emplace_back(tr("Natural order"), defaultOrder);
-  m_pageOrderOptions.emplace_back(tr("Order by completeness"), orderByCompleteness);
+  const auto coverOrder = std::make_shared<OrderByCoverProvider>(m_settings);
+  const auto coverCompletenessOrder = std::make_shared<OrderByCoverProvider>(m_settings, orderByCompleteness);
+  m_pageOrderOptions.emplace_back(tr("Natural order (covers first / last)"), coverOrder);
+  m_pageOrderOptions.emplace_back(tr("Order by completeness (covers first / last)"), coverCompletenessOrder);
 }
 
 Filter::~Filter() = default;

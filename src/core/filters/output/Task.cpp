@@ -44,6 +44,26 @@ using namespace imageproc;
 using namespace dewarping;
 
 namespace output {
+namespace {
+QImage stretchToFullPage(const QImage& image, const QRect& contentRect, const QSize& outputSize) {
+  if (image.isNull() || !outputSize.isValid()) {
+    return image;
+  }
+
+  QRect sourceRect = image.rect().intersected(contentRect);
+  if (sourceRect.isEmpty()) {
+    sourceRect = image.rect();
+  }
+
+  const bool binary = (image.format() == QImage::Format_Mono) || (image.format() == QImage::Format_MonoLSB);
+  QImage result = image.copy(sourceRect).scaled(outputSize, Qt::IgnoreAspectRatio,
+                                                binary ? Qt::FastTransformation : Qt::SmoothTransformation);
+  result.setDotsPerMeterX(image.dotsPerMeterX());
+  result.setDotsPerMeterY(image.dotsPerMeterY());
+  return result;
+}
+}  // namespace
+
 class Task::UiUpdater : public FilterResult {
   Q_DECLARE_TR_FUNCTIONS(output::Task::UiUpdater)
  public:
@@ -157,12 +177,14 @@ FilterResultPtr Task::process(const TaskStatus& status, const FilterData& data, 
   }
 
   const OutputGenerator generator(newXform, contentRectPhys);
+  const bool stretchCover = params.isCover() && params.stretchCover();
 
   OutputImageParams newOutputImageParams(generator.outputImageSize(), generator.outputContentRect(), newXform,
                                          params.outputDpi(), params.colorParams(), params.splittingOptions(),
                                          params.dewarpingOptions(), params.distortionModel(), params.depthPerception(),
                                          params.despeckleLevel(), params.pictureShapeOptions(),
-                                         m_settings->getOutputProcessingParams(m_pageId), params.isBlackOnWhite());
+                                         m_settings->getOutputProcessingParams(m_pageId), params.isBlackOnWhite(),
+                                         stretchCover);
 
   ZoneSet newPictureZones(m_settings->pictureZonesForPage(m_pageId));
   const ZoneSet newFillZones(m_settings->fillZonesForPage(m_pageId));
@@ -342,25 +364,49 @@ FilterResultPtr Task::process(const TaskStatus& status, const FilterData& data, 
       if (renderParams.splitOutput()) {
         auto* outputImageWithForeground = dynamic_cast<OutputImageWithForeground*>(outputImage.get());
 
+        QImage foregroundImage = outputImageWithForeground->getForegroundImage();
+        QImage backgroundImage = outputImageWithForeground->getBackgroundImage();
+        if (stretchCover) {
+          foregroundImage = stretchToFullPage(foregroundImage, generator.outputContentRect(),
+                                              generator.outputImageSize());
+          backgroundImage = stretchToFullPage(backgroundImage, generator.outputContentRect(),
+                                              generator.outputImageSize());
+        }
+
         QDir().mkdir(foregroundDir);
         QDir().mkdir(backgroundDir);
-        if (!TiffWriter::writeImage(foregroundFilePath, outputImageWithForeground->getForegroundImage())
-            || !TiffWriter::writeImage(backgroundFilePath, outputImageWithForeground->getBackgroundImage())) {
+        if (!TiffWriter::writeImage(foregroundFilePath, foregroundImage)
+            || !TiffWriter::writeImage(backgroundFilePath, backgroundImage)) {
           invalidateParams = true;
         }
 
         if (renderParams.originalBackground()) {
           auto* outputImageWithOrigBg = dynamic_cast<OutputImageWithOriginalBackground*>(outputImage.get());
+          QImage originalBackgroundImage = outputImageWithOrigBg->getOriginalBackgroundImage();
+          if (stretchCover) {
+            originalBackgroundImage = stretchToFullPage(originalBackgroundImage, generator.outputContentRect(),
+                                                        generator.outputImageSize());
+          }
 
           QDir().mkdir(originalBackgroundDir);
-          if (!TiffWriter::writeImage(originalBackgroundFilePath,
-                                      outputImageWithOrigBg->getOriginalBackgroundImage())) {
+          if (!TiffWriter::writeImage(originalBackgroundFilePath, originalBackgroundImage)) {
             invalidateParams = true;
           }
         }
       }
 
       outImg = *outputImage;
+      if (stretchCover) {
+        outImg = stretchToFullPage(outImg, generator.outputContentRect(), generator.outputImageSize());
+        if (!automaskImg.isNull()) {
+          automaskImg = BinaryImage(
+              stretchToFullPage(automaskImg.toQImage(), generator.outputContentRect(), generator.outputImageSize()));
+        }
+        if (!specklesImg.isNull()) {
+          specklesImg = BinaryImage(
+              stretchToFullPage(specklesImg.toQImage(), generator.outputContentRect(), generator.outputImageSize()));
+        }
+      }
     }
 
     if (!renderParams.originalBackground()) {
@@ -434,8 +480,10 @@ FilterResultPtr Task::process(const TaskStatus& status, const FilterData& data, 
     // Otherwise it will get constructed on demand.
     despeckleVisualization = despeckleState.visualize();
   }
+  const QRect displayContentRect
+      = stretchCover ? QRect(QPoint(0, 0), outImg.size()) : generator.outputContentRect();
   return std::make_shared<UiUpdater>(m_filter, m_settings, std::move(m_dbg), params, newXform,
-                                     generator.outputContentRect(), m_pageId, data.origImage(), outImg, automaskImg,
+                                     displayContentRect, m_pageId, data.origImage(), outImg, automaskImg,
                                      despeckleState, despeckleVisualization, m_batchProcessing, m_debug);
 }  // Task::process
 
