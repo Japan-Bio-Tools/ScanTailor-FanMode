@@ -127,9 +127,13 @@ bool isRtlText(const QString& text) {
 }
 
 QString reversedCodePoints(const QString& text) {
-  QList<uint> codePoints = text.toUcs4();
+  auto codePoints = text.toUcs4();
   std::reverse(codePoints.begin(), codePoints.end());
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
   return QString::fromUcs4(reinterpret_cast<const char32_t*>(codePoints.constData()), codePoints.size());
+#else
+  return QString::fromUcs4(codePoints.constData(), codePoints.size());
+#endif
 }
 
 int stripTesseractText(std::string* content) {
@@ -148,8 +152,11 @@ int stripTesseractText(std::string* content) {
   return removed;
 }
 
-std::string logicalTextLayer(const Page& page, const double pageLeft, const double pageBottom,
-                             const double pageWidth, const double pageHeight) {
+std::string logicalTextLayer(const Page& page,
+                             const double pageLeft,
+                             const double pageBottom,
+                             const double pageWidth,
+                             const double pageHeight) {
   std::ostringstream stream;
   stream.imbue(std::locale::classic());
   stream << std::fixed << std::setprecision(3);
@@ -219,7 +226,7 @@ bool RtlPdfFixer::rewrite(const QString& inputPdfPath,
         }
       }
 
-      const std::vector<QPDFObjectHandle> mediaBox = pdfPage.getMediaBox().getArrayAsVector();
+      std::vector<QPDFObjectHandle> mediaBox = pdfPage.getMediaBox().getArrayAsVector();
       if (mediaBox.size() != 4) {
         return fail(tr("A generated PDF page has an invalid page box."), errorMessage);
       }
@@ -230,8 +237,7 @@ bool RtlPdfFixer::rewrite(const QString& inputPdfPath,
       if ((width <= 0) || (height <= 0) || (pageData[pageIndex].width <= 0) || (pageData[pageIndex].height <= 0)) {
         return fail(tr("A generated PDF page has invalid dimensions."), errorMessage);
       }
-      pdfPage.addPageContents(pdf.newStream(logicalTextLayer(pageData[pageIndex], left, bottom, width, height)),
-                              false);
+      pdfPage.addPageContents(pdf.newStream(logicalTextLayer(pageData[pageIndex], left, bottom, width, height)), false);
     }
 
     if (removedTextBlocks == 0) {
@@ -243,9 +249,9 @@ bool RtlPdfFixer::rewrite(const QString& inputPdfPath,
     writer.setCompressStreams(true);
     writer.write();
   } catch (const std::exception& exception) {
-    return fail(tr("Unable to create the corrected searchable text layer: %1")
-                    .arg(QString::fromLocal8Bit(exception.what())),
-                errorMessage);
+    return fail(
+        tr("Unable to create the corrected searchable text layer: %1").arg(QString::fromLocal8Bit(exception.what())),
+        errorMessage);
   }
   return true;
 }
