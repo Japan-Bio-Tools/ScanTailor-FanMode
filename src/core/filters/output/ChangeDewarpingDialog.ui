@@ -10,7 +10,7 @@
     <x>0</x>
     <y>0</y>
     <width>320</width>
-    <height>371</height>
+    <height>400</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -39,7 +39,27 @@
          <bool>true</bool>
         </property>
         <property name="text">
-         <string>Auto (experimental)</string>
+         <string>Auto hybrid (experimental)</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QRadioButton" name="autoBookRB">
+        <property name="toolTip">
+         <string>Uses robust text-line geometry and avoids page-edge corrections. Recommended for Arabic and English books.</string>
+        </property>
+        <property name="text">
+         <string>Book text — Arabic / English (recommended)</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QRadioButton" name="autoTableRB">
+        <property name="toolTip">
+         <string>Detects long table and form rules, then uses their real curvature to straighten the grid. Falls back safely if no reliable grid is found.</string>
+        </property>
+        <property name="text">
+         <string>Tables / technical pages (recommended)</string>
         </property>
        </widget>
       </item>
@@ -49,7 +69,7 @@
          <bool>true</bool>
         </property>
         <property name="text">
-         <string>Marginal (experimental)</string>
+         <string>Page margins / gutter (experimental)</string>
         </property>
        </widget>
       </item>

@@ -51,7 +51,7 @@ class InteractiveXSpline : public InteractionHandler {
    */
   bool curveIsProximityLeader(const InteractionState& state, QPointF* pt = nullptr, double* t = nullptr) const;
 
-  void removeControlPointUnderMouse();
+  bool removeControlPointUnderMouse();
 
  protected:
   void onProximityUpdate(const QPointF& screenMousePos, InteractionState& interaction) override;

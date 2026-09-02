@@ -4,11 +4,16 @@
 #include "DewarpingView.h"
 
 #include <CylindricalSurfaceDewarper.h>
+#include <RasterDewarper.h>
 
 #include <QDebug>
+#include <QFontMetrics>
 #include <QPainter>
 #include <QShortcut>
 #include <boost/bind/bind.hpp>
+#include <algorithm>
+#include <cmath>
+#include <exception>
 
 #include "ImagePresentation.h"
 #include "ToLineProjector.h"
@@ -36,10 +41,23 @@ DewarpingView::DewarpingView(const QImage& image,
       m_topSpline(*this),
       m_bottomSpline(*this),
       m_dragHandler(*this),
-      m_zoomHandler(*this) {
+      m_zoomHandler(*this),
+      m_livePreviewEnabled(false),
+      m_simpleManualEnabled(false) {
   setMouseTracking(true);
 
-  const QPolygonF sourceContentRect(virtualToImage().map(virtContentRect));
+  m_sourceContentRect = virtualToImage().map(virtContentRect);
+
+  constexpr int maxPreviewSide = 1200;
+  if (std::max(image.width(), image.height()) > maxPreviewSide) {
+    m_previewSourceImage = image.scaled(maxPreviewSide, maxPreviewSide, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+  } else {
+    m_previewSourceImage = image;
+  }
+  m_sourceToPreview.scale(static_cast<double>(m_previewSourceImage.width()) / image.width(),
+                          static_cast<double>(m_previewSourceImage.height()) / image.height());
+  m_livePreviewTimer.setSingleShot(true);
+  QObject::connect(&m_livePreviewTimer, &QTimer::timeout, this, &DewarpingView::rebuildLivePreview);
 
   XSpline topSpline(m_distortionModel.topCurve().xspline());
   XSpline bottomSpline(m_distortionModel.bottomCurve().xspline());
@@ -48,7 +66,7 @@ DewarpingView::DewarpingView(const QImage& image,
 
     XSpline newTopSpline;
     if (polyline.size() < 2) {
-      initNewSpline(newTopSpline, sourceContentRect[0], sourceContentRect[1], &dewarpingOptions);
+      initNewSpline(newTopSpline, m_sourceContentRect[0], m_sourceContentRect[1], &dewarpingOptions);
     } else {
       initNewSpline(newTopSpline, polyline.front(), polyline.back(), &dewarpingOptions);
       fitSpline(newTopSpline, polyline);
@@ -61,7 +79,7 @@ DewarpingView::DewarpingView(const QImage& image,
 
     XSpline newBottomSpline;
     if (polyline.size() < 2) {
-      initNewSpline(newBottomSpline, sourceContentRect[3], sourceContentRect[2], &dewarpingOptions);
+      initNewSpline(newBottomSpline, m_sourceContentRect[3], m_sourceContentRect[2], &dewarpingOptions);
     } else {
       initNewSpline(newBottomSpline, polyline.front(), polyline.back(), &dewarpingOptions);
       fitSpline(newBottomSpline, polyline);
@@ -84,6 +102,43 @@ DewarpingView::DewarpingView(const QImage& image,
     makeLastFollower(*spline);
   }
 
+  for (int curveIdx = 0; curveIdx < 2; ++curveIdx) {
+    for (int anchorIdx = 0; anchorIdx < 3; ++anchorIdx) {
+      SimpleHandle& handle = m_simpleHandles[curveIdx][anchorIdx];
+      handle.point.setPositionCallback(
+          boost::bind(&DewarpingView::simpleHandlePosition, this, curveIdx, anchorIdx));
+      handle.point.setMoveRequestCallback(boost::bind(&DewarpingView::simpleHandleMoveRequest, this, curveIdx,
+                                                       anchorIdx, boost::placeholders::_1, boost::placeholders::_2));
+      handle.point.setDragFinishedCallback(
+          boost::bind(&DewarpingView::simpleHandleDragFinished, this, curveIdx, anchorIdx));
+      handle.point.setHitRadius(13.0);
+      handle.point.setProximityPriority(10);
+      handle.handler.setObject(&handle.point);
+      handle.handler.setKeyboardModifiers(
+          {Qt::NoModifier, Qt::ShiftModifier, Qt::ControlModifier, Qt::ShiftModifier | Qt::ControlModifier});
+      handle.handler.setProximityStatusTip(
+          tr("Drag onto the printed text line. The point snaps to nearby dark text when released."));
+    }
+  }
+
+  for (int borderIdx = 0; borderIdx < 2; ++borderIdx) {
+    for (int curveIdx = 0; curveIdx < 2; ++curveIdx) {
+      SimpleHandle& handle = m_simpleBorderHandles[borderIdx][curveIdx];
+      handle.point.setPositionCallback(
+          boost::bind(&DewarpingView::simpleBorderHandlePosition, this, borderIdx, curveIdx));
+      handle.point.setMoveRequestCallback(boost::bind(&DewarpingView::simpleBorderMoveRequest, this, borderIdx,
+                                                       curveIdx, boost::placeholders::_1, boost::placeholders::_2));
+      handle.point.setDragFinishedCallback(boost::bind(&DewarpingView::simpleBorderDragFinished, this));
+      handle.point.setHitRadius(13.0);
+      handle.point.setProximityPriority(11);
+      handle.handler.setObject(&handle.point);
+      handle.handler.setKeyboardModifiers(
+          {Qt::NoModifier, Qt::ShiftModifier, Qt::ControlModifier, Qt::ShiftModifier | Qt::ControlModifier});
+      handle.handler.setProximityStatusTip(
+          tr("Drag this blue point to the page border. Each corner moves independently for slanted sides."));
+    }
+  }
+
   m_distortionModel.setTopCurve(dewarping::Curve(m_topSpline.spline()));
   m_distortionModel.setBottomCurve(dewarping::Curve(m_bottomSpline.spline()));
 
@@ -93,8 +148,20 @@ DewarpingView::DewarpingView(const QImage& image,
 
   m_removeControlPointShortcut = new QShortcut(Qt::Key_D, this);
   QObject::connect(m_removeControlPointShortcut, &QShortcut::activated, [this]() {
-    m_topSpline.removeControlPointUnderMouse();
-    m_bottomSpline.removeControlPointUnderMouse();
+    if (m_simpleManualEnabled) {
+      return;
+    }
+    const bool topChanged = m_topSpline.removeControlPointUnderMouse();
+    const bool bottomChanged = m_bottomSpline.removeControlPointUnderMouse();
+    if (topChanged) {
+      curveModified(0);
+    }
+    if (bottomChanged) {
+      curveModified(1);
+    }
+    if (topChanged || bottomChanged) {
+      dragFinished();
+    }
   });
 }
 
@@ -106,7 +173,9 @@ void DewarpingView::initNewSpline(XSpline& spline,
                                   const DewarpingOptions* dewarpingOptions) {
   const QLineF line(p1, p2);
   spline.appendControlPoint(line.p1(), 0);
-  if ((*dewarpingOptions).dewarpingMode() == AUTO) {
+  if (dewarpingOptions
+      && (((*dewarpingOptions).dewarpingMode() == AUTO) || ((*dewarpingOptions).dewarpingMode() == AUTO_BOOK)
+          || ((*dewarpingOptions).dewarpingMode() == AUTO_TABLE))) {
     spline.appendControlPoint(line.pointAt(1.0 / 4.0), 1);
     spline.appendControlPoint(line.pointAt(2.0 / 4.0), 1);
     spline.appendControlPoint(line.pointAt(3.0 / 4.0), 1);
@@ -153,11 +222,120 @@ void DewarpingView::fitSpline(XSpline& spline, const std::vector<QPointF>& polyl
 
 void DewarpingView::depthPerceptionChanged(double val) {
   m_depthPerception.setValue(val);
+  scheduleLivePreview();
   update();
+}
+
+void DewarpingView::livePreviewChanged(const bool enabled) {
+  m_livePreviewEnabled = enabled;
+  if (enabled) {
+    scheduleLivePreview(0);
+  } else {
+    m_livePreviewTimer.stop();
+    m_livePreviewImage = QImage();
+    update();
+  }
+}
+
+void DewarpingView::simpleManualModeChanged(const bool enabled) {
+  if (m_simpleManualEnabled == enabled) {
+    return;
+  }
+  m_simpleManualEnabled = enabled;
+  setSimpleHandlersLinked(enabled);
+  update();
+}
+
+void DewarpingView::resetToNormalGrid() {
+  if (m_sourceContentRect.size() < 4) {
+    return;
+  }
+
+  XSpline topSpline;
+  XSpline bottomSpline;
+  initNewSpline(topSpline, m_sourceContentRect[0], m_sourceContentRect[1]);
+  initNewSpline(bottomSpline, m_sourceContentRect[3], m_sourceContentRect[2]);
+  m_topSpline.setSpline(topSpline);
+  m_bottomSpline.setSpline(bottomSpline);
+  m_distortionModel.setTopCurve(dewarping::Curve(topSpline));
+  m_distortionModel.setBottomCurve(dewarping::Curve(bottomSpline));
+  m_dewarpingOptions.setDewarpingMode(MANUAL);
+  m_dewarpingOptions.setPostDeskewAngle(0.0);
+  scheduleLivePreview(0);
+  update();
+  emit distortionModelChanged(m_distortionModel);
+}
+
+void DewarpingView::scheduleLivePreview(const int delayMs) {
+  if (m_livePreviewEnabled) {
+    m_livePreviewTimer.start(std::max(0, delayMs));
+  }
+}
+
+void DewarpingView::rebuildLivePreview() {
+  if (!m_livePreviewEnabled || !m_distortionModel.isValid() || m_previewSourceImage.isNull()) {
+    m_livePreviewImage = QImage();
+    update();
+    return;
+  }
+
+  try {
+    std::vector<QPointF> top(m_distortionModel.topCurve().polyline());
+    std::vector<QPointF> bottom(m_distortionModel.bottomCurve().polyline());
+    for (QPointF& point : top) {
+      point = m_sourceToPreview.map(point);
+    }
+    for (QPointF& point : bottom) {
+      point = m_sourceToPreview.map(point);
+    }
+
+    const dewarping::CylindricalSurfaceDewarper dewarper(top, bottom, m_depthPerception.value());
+    const QRectF previewContentRect = m_sourceToPreview.map(m_sourceContentRect).boundingRect();
+    const QRectF modelDomain
+        = m_distortionModel.modelDomain(dewarper, m_sourceToPreview, previewContentRect);
+    m_livePreviewImage = dewarping::RasterDewarper::dewarp(
+        m_previewSourceImage, m_previewSourceImage.size(), dewarper, modelDomain, Qt::white);
+  } catch (const std::exception& error) {
+    qWarning() << "Live dewarping preview failed:" << error.what();
+    m_livePreviewImage = QImage();
+  }
+  update();
+}
+
+void DewarpingView::paintInPlacePreview(QPainter& painter) const {
+  if (!m_livePreviewEnabled || m_livePreviewImage.isNull()) {
+    return;
+  }
+
+  painter.save();
+  painter.setWorldTransform(QTransform());
+  painter.setRenderHint(QPainter::SmoothPixmapTransform);
+
+  const QTransform previewToSource(m_sourceToPreview.inverted());
+  const double width = m_livePreviewImage.width();
+  const double height = m_livePreviewImage.height();
+  QPolygonF previewQuad;
+  previewQuad << QPointF(0, 0) << QPointF(width, 0) << QPointF(width, height) << QPointF(0, height);
+  QPolygonF widgetQuad;
+  for (const QPointF& previewPoint : previewQuad) {
+    widgetQuad << sourceToWidget(previewToSource.map(previewPoint));
+  }
+
+  QTransform previewToWidget;
+  if (QTransform::quadToQuad(previewQuad, widgetQuad, previewToWidget)) {
+    painter.setWorldTransform(previewToWidget);
+    painter.drawImage(QPointF(0, 0), m_livePreviewImage);
+  }
+  painter.restore();
 }
 
 void DewarpingView::onPaint(QPainter& painter, const InteractionState& interaction) {
   painter.setRenderHint(QPainter::Antialiasing);
+
+  // The corrected image replaces the original in the same central page area.
+  // Controls are painted afterwards so editing remains possible without a
+  // separate preview panel obscuring the page.
+  paintInPlacePreview(painter);
 
   painter.setPen(Qt::NoPen);
   painter.setBrush(QColor(0xff, 0xff, 0xff, 150));  // Translucent white.
@@ -179,7 +357,7 @@ void DewarpingView::onPaint(QPainter& painter, const InteractionState& interacti
 
   bool validModel = m_distortionModel.isValid();
 
-  if (validModel) {
+  if (!m_simpleManualEnabled && validModel) {
     try {
       std::vector<QVector<QPointF>> curves(numHorGridLines);
 
@@ -208,7 +386,7 @@ void DewarpingView::onPaint(QPainter& painter, const InteractionState& interacti
       validModel = false;
     }
   }  // validModel
-  if (!validModel) {
+  if (!m_simpleManualEnabled && !validModel) {
     // Just draw the frame.
     const dewarping::Curve& topCurve = m_distortionModel.topCurve();
     const dewarping::Curve& bottomCurve = m_distortionModel.bottomCurve();
@@ -223,9 +401,86 @@ void DewarpingView::onPaint(QPainter& painter, const InteractionState& interacti
 #endif
   }
 
-  paintXSpline(painter, interaction, m_topSpline);
-  paintXSpline(painter, interaction, m_bottomSpline);
+  if (m_simpleManualEnabled) {
+    paintSimpleControls(painter, interaction);
+  } else {
+    paintXSpline(painter, interaction, m_topSpline);
+    paintXSpline(painter, interaction, m_bottomSpline);
+  }
 }  // DewarpingView::onPaint
+
+void DewarpingView::paintSimpleControls(QPainter& painter, const InteractionState& interaction) {
+  const QColor curveColors[2] = {QColor(235, 120, 20), QColor(20, 155, 115)};
+  const QColor borderColor(35, 115, 215);
+
+  painter.save();
+  painter.setBrush(Qt::NoBrush);
+  for (int curveIdx = 0; curveIdx < 2; ++curveIdx) {
+    const XSpline& spline = curveIdx == 0 ? m_topSpline.spline() : m_bottomSpline.spline();
+    const std::vector<QPointF> polyline(spline.toPolyline());
+    QPen curvePen(curveColors[curveIdx], 3.0);
+    curvePen.setCosmetic(true);
+    painter.setPen(curvePen);
+    painter.drawPolyline(polyline.data(), static_cast<int>(polyline.size()));
+  }
+
+  QPen connectorPen(QColor(60, 115, 200, 150), 1.5, Qt::DashLine);
+  connectorPen.setCosmetic(true);
+  painter.setPen(connectorPen);
+  for (int anchorIdx = 0; anchorIdx < 3; ++anchorIdx) {
+    painter.drawLine(simpleAnchorPosition(0, anchorIdx), simpleAnchorPosition(1, anchorIdx));
+  }
+  QPen borderPen(borderColor, 3.0);
+  borderPen.setCosmetic(true);
+  painter.setPen(borderPen);
+  for (int borderIdx = 0; borderIdx < 2; ++borderIdx) {
+    painter.drawLine(simpleBorderPosition(borderIdx, 0), simpleBorderPosition(borderIdx, 1));
+  }
+  painter.restore();
+
+  painter.save();
+  painter.setWorldTransform(QTransform());
+  for (int curveIdx = 0; curveIdx < 2; ++curveIdx) {
+    for (int anchorIdx = 0; anchorIdx < 3; ++anchorIdx) {
+      const QPointF center(simpleHandlePosition(curveIdx, anchorIdx));
+      const bool highlighted = m_simpleHandles[curveIdx][anchorIdx].handler.proximityLeader(interaction);
+      painter.setPen(QPen(Qt::white, highlighted ? 3.0 : 2.0));
+      painter.setBrush(highlighted ? curveColors[curveIdx].lighter(125) : curveColors[curveIdx]);
+      painter.drawEllipse(center, highlighted ? 11.0 : 9.0, highlighted ? 11.0 : 9.0);
+      painter.setPen(Qt::white);
+      painter.drawText(QRectF(center.x() - 9, center.y() - 9, 18, 18), Qt::AlignCenter,
+                       QString::number(anchorIdx + 1));
+    }
+  }
+
+  for (int borderIdx = 0; borderIdx < 2; ++borderIdx) {
+    for (int curveIdx = 0; curveIdx < 2; ++curveIdx) {
+      const QPointF center(simpleBorderHandlePosition(borderIdx, curveIdx));
+      const bool highlighted = m_simpleBorderHandles[borderIdx][curveIdx].handler.proximityLeader(interaction);
+      const double radius = highlighted ? 11.0 : 9.0;
+      painter.setPen(QPen(Qt::white, highlighted ? 3.0 : 2.0));
+      painter.setBrush(highlighted ? borderColor.lighter(125) : borderColor);
+      painter.drawRoundedRect(QRectF(center.x() - radius, center.y() - radius, 2.0 * radius, 2.0 * radius),
+                              3.0, 3.0);
+      painter.setPen(Qt::white);
+      painter.drawText(QRectF(center.x() - radius, center.y() - radius, 2.0 * radius, 2.0 * radius),
+                       Qt::AlignCenter, borderIdx == 0 ? tr("L") : tr("R"));
+    }
+  }
+
+  const QString instruction
+      = tr("Simple manual: place orange 1-2-3 on an upper text line and green 1-2-3 on a lower line. "
+           "Use the four blue L/R points for the left and right page borders.");
+  const QRect availableRect(viewport()->rect().adjusted(12, 12, -12, -12));
+  const QRect textRect(painter.fontMetrics().boundingRect(availableRect, Qt::TextWordWrap, instruction));
+  const QRect panelRect(textRect.adjusted(-8, -5, 8, 5));
+  painter.setPen(QPen(QColor(55, 75, 105), 1));
+  painter.setBrush(QColor(255, 255, 255, 220));
+  painter.drawRoundedRect(panelRect, 4, 4);
+  painter.setPen(QColor(35, 50, 75));
+  painter.drawText(textRect, Qt::TextWordWrap, instruction);
+  painter.restore();
+}
 
 void DewarpingView::paintXSpline(QPainter& painter,
                                  const InteractionState& interaction,
@@ -271,17 +526,202 @@ void DewarpingView::paintXSpline(QPainter& painter,
   painter.restore();
 }  // DewarpingView::paintXSpline
 
+QPointF DewarpingView::simpleAnchorPosition(const int curveIdx, const int anchorIdx) const {
+  const XSpline& spline = curveIdx == 0 ? m_topSpline.spline() : m_bottomSpline.spline();
+  constexpr double anchorParameters[3] = {0.18, 0.5, 0.82};
+  return spline.pointAt(anchorParameters[qBound(0, anchorIdx, 2)]);
+}
+
+QPointF DewarpingView::simpleHandlePosition(const int curveIdx, const int anchorIdx) const {
+  return sourceToWidget(simpleAnchorPosition(curveIdx, anchorIdx));
+}
+
+QPointF DewarpingView::simpleBorderPosition(const int borderIdx, const int curveIdx) const {
+  const XSpline& spline = curveIdx == 0 ? m_topSpline.spline() : m_bottomSpline.spline();
+  return spline.pointAt(borderIdx == 0 ? 0.0 : 1.0);
+}
+
+QPointF DewarpingView::simpleBorderHandlePosition(const int borderIdx, const int curveIdx) const {
+  return sourceToWidget(simpleBorderPosition(borderIdx, curveIdx));
+}
+
+void DewarpingView::simpleHandleMoveRequest(const int curveIdx,
+                                            const int anchorIdx,
+                                            const QPointF& widgetPos,
+                                            const Qt::KeyboardModifiers modifiers) {
+  QPointF sourcePos(widgetToSource(widgetPos));
+  const QPointF currentPos(simpleAnchorPosition(curveIdx, anchorIdx));
+  if (modifiers.testFlag(Qt::ShiftModifier)) {
+    sourcePos.setX(currentPos.x());
+  }
+  if (modifiers.testFlag(Qt::ControlModifier)) {
+    sourcePos.setY(currentPos.y());
+  }
+  moveSimpleAnchor(curveIdx, anchorIdx, sourcePos);
+}
+
+void DewarpingView::simpleHandleDragFinished(const int curveIdx, const int anchorIdx) {
+  const QPointF currentPos(simpleAnchorPosition(curveIdx, anchorIdx));
+  const QPointF snappedPos(snapToNearbyTextLine(currentPos));
+  if (QLineF(currentPos, snappedPos).length() > 0.5) {
+    moveSimpleAnchor(curveIdx, anchorIdx, snappedPos);
+  }
+  dragFinished();
+}
+
+void DewarpingView::simpleBorderMoveRequest(const int borderIdx,
+                                            const int curveIdx,
+                                            const QPointF& widgetPos,
+                                            const Qt::KeyboardModifiers modifiers) {
+  QPointF sourcePos(widgetToSource(widgetPos));
+  const QPointF currentPos(simpleBorderPosition(borderIdx, curveIdx));
+  if (modifiers.testFlag(Qt::ShiftModifier)) {
+    sourcePos.setX(currentPos.x());
+  }
+  if (modifiers.testFlag(Qt::ControlModifier)) {
+    sourcePos.setY(currentPos.y());
+  }
+  moveSimpleBorderPoint(borderIdx, curveIdx, sourcePos);
+}
+
+void DewarpingView::simpleBorderDragFinished() {
+  dragFinished();
+}
+
+void DewarpingView::moveSimpleAnchor(const int curveIdx, const int anchorIdx, const QPointF& sourcePos) {
+  InteractiveXSpline& interactiveSpline = curveIdx == 0 ? m_topSpline : m_bottomSpline;
+  XSpline spline(interactiveSpline.spline());
+  if (spline.numControlPoints() < 2) {
+    return;
+  }
+
+  constexpr double anchorParameters[3] = {0.18, 0.5, 0.82};
+  const double anchorT = anchorParameters[qBound(0, anchorIdx, 2)];
+  // Apply a smooth displacement field instead of moving a single technical
+  // spline point. This makes the three visible handles behave like the left,
+  // middle and right portions of the printed line while preserving details
+  // from a good automatic model.
+  for (int correctionPass = 0; correctionPass < 3; ++correctionPass) {
+    const QPointF correction(sourcePos - spline.pointAt(anchorT));
+    if (QLineF(QPointF(), correction).length() < 0.05) {
+      break;
+    }
+    const int numControlPoints = spline.numControlPoints();
+    for (int pointIdx = 0; pointIdx < numControlPoints; ++pointIdx) {
+      const double t = spline.controlPointIndexToT(pointIdx);
+      // Keep the four page-border corners stationary while the numbered
+      // handles shape the text lines inside them.
+      constexpr double sigma = 0.18;
+      const double distance = (t - anchorT) / sigma;
+      const double edgeWindow = 4.0 * t * (1.0 - t);
+      const double anchorWindow = 4.0 * anchorT * (1.0 - anchorT);
+      const double weight = std::exp(-0.5 * distance * distance) * edgeWindow / anchorWindow;
+      spline.moveControlPoint(pointIdx, spline.controlPointPosition(pointIdx) + weight * correction);
+    }
+  }
+  interactiveSpline.setSpline(spline);
+}
+
+void DewarpingView::moveSimpleBorderPoint(const int borderIdx,
+                                          const int curveIdx,
+                                          const QPointF& sourcePos) {
+  InteractiveXSpline& interactiveSpline = curveIdx == 0 ? m_topSpline : m_bottomSpline;
+  XSpline spline(interactiveSpline.spline());
+  if (spline.numControlPoints() < 2) {
+    return;
+  }
+  const int pointIdx = borderIdx == 0 ? 0 : spline.numControlPoints() - 1;
+  spline.moveControlPoint(pointIdx, sourcePos);
+  interactiveSpline.setSpline(spline);
+}
+
+QPointF DewarpingView::snapToNearbyTextLine(const QPointF& sourcePos) const {
+  if (m_previewSourceImage.isNull()) {
+    return sourcePos;
+  }
+
+  const QPointF previewPos(m_sourceToPreview.map(sourcePos));
+  const int centerX = qRound(previewPos.x());
+  const int centerY = qRound(previewPos.y());
+  const int searchRadius = qBound(6, m_previewSourceImage.height() / 60, 22);
+  const int halfWidth = qBound(18, m_previewSourceImage.width() / 24, 60);
+  const int left = qBound(0, centerX - halfWidth, m_previewSourceImage.width() - 1);
+  const int right = qBound(0, centerX + halfWidth, m_previewSourceImage.width() - 1);
+  const int top = qBound(0, centerY - searchRadius, m_previewSourceImage.height() - 1);
+  const int bottom = qBound(0, centerY + searchRadius, m_previewSourceImage.height() - 1);
+
+  double bestScore = 0.0;
+  int bestY = centerY;
+  int samplesPerRow = 0;
+  for (int y = top; y <= bottom; ++y) {
+    double score = 0.0;
+    int samples = 0;
+    for (int x = left; x <= right; x += 2) {
+      const int gray = qGray(m_previewSourceImage.pixel(x, y));
+      score += std::max(0, 210 - gray);
+      ++samples;
+    }
+    samplesPerRow = samples;
+    if (score > bestScore) {
+      bestScore = score;
+      bestY = y;
+    }
+  }
+
+  // Avoid snapping to random noise or an empty paper background.
+  if ((samplesPerRow == 0) || (bestScore < samplesPerRow * 12.0)) {
+    return sourcePos;
+  }
+
+  const QTransform previewToSource(m_sourceToPreview.inverted());
+  const QPointF snappedSource(previewToSource.map(QPointF(previewPos.x(), bestY)));
+  return QPointF(sourcePos.x(), snappedSource.y());
+}
+
+void DewarpingView::setSimpleHandlersLinked(const bool linked) {
+  if (linked) {
+    m_topSpline.unlink();
+    m_bottomSpline.unlink();
+    for (auto& curveHandles : m_simpleHandles) {
+      for (SimpleHandle& handle : curveHandles) {
+        makeLastFollower(handle.handler);
+      }
+    }
+    for (auto& borderHandles : m_simpleBorderHandles) {
+      for (SimpleHandle& handle : borderHandles) {
+        makeLastFollower(handle.handler);
+      }
+    }
+  } else {
+    for (auto& curveHandles : m_simpleHandles) {
+      for (SimpleHandle& handle : curveHandles) {
+        handle.handler.unlink();
+      }
+    }
+    for (auto& borderHandles : m_simpleBorderHandles) {
+      for (SimpleHandle& handle : borderHandles) {
+        handle.handler.unlink();
+      }
+    }
+    makeLastFollower(m_topSpline);
+    makeLastFollower(m_bottomSpline);
+  }
+}
+
 void DewarpingView::curveModified(int curveIdx) {
   if (curveIdx == 0) {
     m_distortionModel.setTopCurve(dewarping::Curve(m_topSpline.spline()));
   } else {
     m_distortionModel.setBottomCurve(dewarping::Curve(m_bottomSpline.spline()));
   }
+  scheduleLivePreview();
   update();
 }
 
 void DewarpingView::dragFinished() {
-  if ((m_dewarpingOptions.dewarpingMode() == AUTO) || (m_dewarpingOptions.dewarpingMode() == MARGINAL)) {
+  if ((m_dewarpingOptions.dewarpingMode() == AUTO) || (m_dewarpingOptions.dewarpingMode() == AUTO_BOOK)
+      || (m_dewarpingOptions.dewarpingMode() == MARGINAL)
+      || (m_dewarpingOptions.dewarpingMode() == AUTO_TABLE)) {
     m_dewarpingOptions.setDewarpingMode(MANUAL);
   }
   emit distortionModelChanged(m_distortionModel);

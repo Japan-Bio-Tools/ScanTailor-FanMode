@@ -6,6 +6,7 @@
 #include <Binarize.h>
 #include <BinaryImage.h>
 #include <ConnComp.h>
+#include <ConnCompEraser.h>
 #include <ConnCompEraserExt.h>
 #include <Connectivity.h>
 #include <ConnectivityMap.h>
@@ -23,6 +24,7 @@
 #include <QDebug>
 #include <QPainter>
 #include <QPainterPath>
+#include <algorithm>
 #include <cmath>
 #include <queue>
 
@@ -71,6 +73,7 @@ struct PreferVertical {
 QRectF ContentBoxFinder::findContentBox(const TaskStatus& status,
                                         const FilterData& data,
                                         const QRectF& pageRect,
+                                        const ContentDetectionOptions& options,
                                         DebugImages* dbg) {
   ImageTransformation xform150dpi(data.xform());
   xform150dpi.preScaleToDpi(Dpi(150, 150));
@@ -380,11 +383,248 @@ QRectF ContentBoxFinder::findContentBox(const TaskStatus& status,
     contentRect.adjust(-1, -1, 1, 1);
   }
 
-  // Transform back from 150dpi.
+  // Transform the standard result back from 150 dpi.
   QTransform combinedXform(xform150dpi.transform().inverted());
   combinedXform *= data.xform().transform();
-  return combinedXform.map(QRectF(contentRect)).boundingRect().intersected(data.xform().resultingRect());
+  const QRectF standardContentRect
+      = combinedXform.map(QRectF(contentRect)).boundingRect().intersected(data.xform().resultingRect());
+
+  if (!options.accurate || (!options.includeHeaderTitle && !options.includePageNumber)) {
+    return standardContentRect;
+  }
+
+  status.throwIfCancelled();
+
+  // The regular detector intentionally works at 150 dpi and is aggressive
+  // about isolated blocks.  Accurate mode performs a second, limited 300 dpi
+  // pass in the edge bands only.  This preserves small running headers,
+  // separated titles and one-glyph page numbers without admitting noise from
+  // the whole page.
+  ImageTransformation xform300dpi(data.xform());
+  xform300dpi.preScaleToDpi(Dpi(300, 300));
+  QImage gray300(transformToGray(dataGrayImage, xform300dpi.transform(), xform300dpi.resultingRect().toRect(),
+                                 OutsidePixels::assumeColor(QColor(255, 255, 255))));
+  BinaryImage bw300(binarizeWolf(gray300, QSize(41, 41), 50));
+
+  QTransform xform300ToVirtual(xform300dpi.transform().inverted());
+  xform300ToVirtual *= data.xform().transform();
+  bool invertible = false;
+  const QTransform virtualToXform300 = xform300ToVirtual.inverted(&invertible);
+  if (!invertible) {
+    return standardContentRect;
+  }
+
+  const QRect pageRect300
+      = virtualToXform300.mapRect(pageRect).toAlignedRect().intersected(bw300.rect());
+  if (pageRect300.isEmpty()) {
+    return standardContentRect;
+  }
+  bw300.fillExcept(pageRect300, WHITE);
+  if (dbg) {
+    dbg->add(bw300, "accurate_bw300");
+  }
+
+  const QRect standardContentRect300
+      = virtualToXform300.mapRect(standardContentRect).toAlignedRect().intersected(pageRect300);
+  const QRect accurateContentRect300
+      = expandContentBoxForEdgeText(bw300, pageRect300, standardContentRect300, options.includeHeaderTitle,
+                                    options.includePageNumber);
+  if (accurateContentRect300 == standardContentRect300) {
+    return standardContentRect;
+  }
+
+  if (dbg) {
+    QImage visualization(gray300.convertToFormat(QImage::Format_ARGB32_Premultiplied));
+    QPainter painter(&visualization);
+    painter.setBrush(Qt::NoBrush);
+    painter.setPen(QPen(QColor(255, 165, 0, 220), 3));
+    painter.drawRect(standardContentRect300);
+    painter.setPen(QPen(QColor(0, 190, 80, 230), 4));
+    painter.drawRect(accurateContentRect300);
+    painter.end();
+    dbg->add(visualization, "accurate_edge_text");
+  }
+
+  return xform300ToVirtual.mapRect(QRectF(accurateContentRect300))
+      .intersected(pageRect)
+      .intersected(data.xform().resultingRect());
 }  // ContentBoxFinder::findContentBox
+
+QRect ContentBoxFinder::expandContentBoxForEdgeText(const imageproc::BinaryImage& content,
+                                                     const QRect& pageRect,
+                                                     const QRect& standardContentRect,
+                                                     const bool includeHeaderTitle,
+                                                     const bool includePageNumber) {
+  const QRect page(pageRect.intersected(content.rect()));
+  if (page.isEmpty() || (!includeHeaderTitle && !includePageNumber)) {
+    return standardContentRect.intersected(page);
+  }
+
+  const int insetX = std::max(2, page.width() / 250);
+  const int insetY = std::max(2, page.height() / 350);
+  const QRect safePage(page.adjusted(insetX, insetY, -insetX, -insetY));
+  if (safePage.isEmpty()) {
+    return standardContentRect.intersected(page);
+  }
+
+  struct Component {
+    QRect rect;
+    int pixels;
+    bool significant;
+  };
+  struct TextLine {
+    QRect rect;
+    int pixels = 0;
+    int componentCount = 0;
+    int significantCount = 0;
+    int tallestComponent = 0;
+  };
+
+  QRect detectedBounds;
+  const auto horizontalGap = [](const QRect& lhs, const QRect& rhs) {
+    if (lhs.right() < rhs.left()) {
+      return rhs.left() - lhs.right() - 1;
+    }
+    if (rhs.right() < lhs.left()) {
+      return lhs.left() - rhs.right() - 1;
+    }
+    return 0;
+  };
+
+  const auto detectTextLines = [&](const QRect& requestedRegion, const bool pageNumberBand) {
+    const QRect region(requestedRegion.intersected(safePage));
+    if ((region.width() < 4) || (region.height() < 4)) {
+      return;
+    }
+
+    BinaryImage regionImage(region.size(), WHITE);
+    rasterOp<RopSrc>(regionImage, regionImage.rect(), content, region.topLeft());
+    ConnCompEraser eraser(regionImage, CONN8);
+    std::vector<Component> components;
+    ConnComp cc;
+    while (!(cc = eraser.nextConnComp()).isNull()) {
+      QRect rect(cc.rect().translated(region.topLeft()));
+      const int width = rect.width();
+      const int height = rect.height();
+      const int pixels = cc.pixCount();
+      const int area = width * height;
+      if ((pixels < 2) || (width <= 0) || (height <= 0)) {
+        continue;
+      }
+      if ((height > page.height() / 8) || (width > page.width() * 2 / 3)) {
+        continue;
+      }
+      if (((height <= 2) && (width > std::max(12, page.width() / 80)))
+          || ((width <= 2) && (height > std::max(12, page.height() / 100)))) {
+        continue;  // Rules and border fragments are not text.
+      }
+      const double fill = static_cast<double>(pixels) / std::max(1, area);
+      if ((fill < 0.025) || (fill > 0.94)) {
+        continue;
+      }
+
+      const bool significant = (pixels >= 7) && ((height >= 4) || (width >= 5));
+      components.push_back(Component{rect, pixels, significant});
+    }
+
+    std::sort(components.begin(), components.end(), [](const Component& lhs, const Component& rhs) {
+      if (lhs.rect.center().y() != rhs.rect.center().y()) {
+        return lhs.rect.center().y() < rhs.rect.center().y();
+      }
+      return lhs.rect.left() < rhs.rect.left();
+    });
+
+    std::vector<TextLine> lines;
+    for (const Component& component : components) {
+      int bestLine = -1;
+      int bestDistance = std::numeric_limits<int>::max();
+      for (int i = 0; i < static_cast<int>(lines.size()); ++i) {
+        const TextLine& line = lines[i];
+        const int verticalDistance = std::abs(component.rect.center().y() - line.rect.center().y());
+        const int verticalTolerance
+            = std::max(4, 3 * std::max(component.rect.height(), line.tallestComponent) / 4);
+        const int gap = horizontalGap(component.rect, line.rect);
+        const int horizontalTolerance
+            = std::max(page.width() / 7, 8 * std::max(component.rect.height(), line.tallestComponent));
+        if ((verticalDistance <= verticalTolerance) && (gap <= horizontalTolerance)
+            && (verticalDistance < bestDistance)) {
+          bestLine = i;
+          bestDistance = verticalDistance;
+        }
+      }
+
+      if (bestLine < 0) {
+        TextLine line;
+        line.rect = component.rect;
+        line.pixels = component.pixels;
+        line.componentCount = 1;
+        line.significantCount = component.significant ? 1 : 0;
+        line.tallestComponent = component.rect.height();
+        lines.push_back(line);
+      } else {
+        TextLine& line = lines[bestLine];
+        line.rect = line.rect.united(component.rect);
+        line.pixels += component.pixels;
+        ++line.componentCount;
+        line.significantCount += component.significant ? 1 : 0;
+        line.tallestComponent = std::max(line.tallestComponent, component.rect.height());
+      }
+    }
+
+    for (const TextLine& line : lines) {
+      const int width = line.rect.width();
+      const int height = line.rect.height();
+      if ((line.significantCount == 0) || (height < 3)) {
+        continue;
+      }
+
+      bool plausible = false;
+      if (pageNumberBand) {
+        plausible = (height <= std::max(12, page.height() / 16)) && (width <= page.width() / 3)
+                    && (line.pixels >= 6)
+                    && ((line.significantCount >= 2) || ((line.significantCount == 1) && (height >= 5)));
+      } else {
+        plausible = (height <= page.height() / 8) && (width >= std::max(6, page.width() / 100))
+                    && (line.pixels >= 14)
+                    && ((line.significantCount >= 2)
+                        || ((line.significantCount == 1) && (width >= page.width() / 80)
+                            && (line.pixels >= 20)));
+      }
+
+      if (plausible) {
+        detectedBounds = detectedBounds.isNull() ? line.rect : detectedBounds.united(line.rect);
+      }
+    }
+  };
+
+  const QRect standard(standardContentRect.intersected(safePage));
+  const int bodyTop = standard.isEmpty() ? safePage.top() + safePage.height() * 45 / 100 : standard.top();
+  const int bodyBottom
+      = standard.isEmpty() ? safePage.top() + safePage.height() * 60 / 100 : standard.bottom();
+
+  if (includeHeaderTitle) {
+    const int headerBottom = std::min(bodyTop - 1, safePage.top() + safePage.height() * 45 / 100);
+    detectTextLines(QRect(safePage.left(), safePage.top(), safePage.width(), headerBottom - safePage.top() + 1),
+                    false);
+  }
+  if (includePageNumber) {
+    const int topBandBottom = std::min(bodyTop - 1, safePage.top() + safePage.height() / 5);
+    detectTextLines(QRect(safePage.left(), safePage.top(), safePage.width(), topBandBottom - safePage.top() + 1),
+                    true);
+    const int bottomBandTop = std::max(bodyBottom + 1, safePage.top() + safePage.height() * 3 / 5);
+    detectTextLines(QRect(safePage.left(), bottomBandTop, safePage.width(), safePage.bottom() - bottomBandTop + 1),
+                    true);
+  }
+
+  QRect result(standardContentRect.intersected(page));
+  if (!detectedBounds.isNull()) {
+    const int paddingX = std::max(3, page.width() / 220);
+    const int paddingY = std::max(3, page.height() / 300);
+    detectedBounds = detectedBounds.adjusted(-paddingX, -paddingY, paddingX, paddingY).intersected(safePage);
+    result = result.isNull() ? detectedBounds : result.united(detectedBounds);
+  }
+  return result.intersected(page);
+}
 
 namespace {
 struct Bounds {

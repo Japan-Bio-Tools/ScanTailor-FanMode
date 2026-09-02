@@ -223,8 +223,8 @@
          <set>Qt::AlignCenter</set>
         </property>
         <layout class="QGridLayout" name="gridLayout_2">
-         <item row="1" column="1">
-          <widget class="QPushButton" name="contentDetectAutoBtn">
+          <item row="1" column="0">
+           <widget class="QPushButton" name="contentDetectAutoBtn">
            <property name="text">
             <string>Auto</string>
            </property>
@@ -239,7 +239,7 @@
            </property>
           </widget>
          </item>
-         <item row="0" column="1" colspan="2">
+          <item row="0" column="0" colspan="3">
           <widget class="QPushButton" name="contentDetectDisableBtn">
            <property name="text">
             <string>Disable</string>
@@ -252,8 +252,24 @@
            </property>
           </widget>
          </item>
-         <item row="1" column="2">
-          <widget class="QPushButton" name="contentDetectManualBtn">
+          <item row="1" column="1">
+           <widget class="QPushButton" name="contentDetectAccurateBtn">
+            <property name="toolTip">
+             <string>Uses an additional high-resolution pass to protect isolated titles, headers, and page numbers.</string>
+            </property>
+            <property name="text">
+             <string>Accurate</string>
+            </property>
+            <property name="checkable">
+             <bool>true</bool>
+            </property>
+            <property name="autoExclusive">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="2">
+           <widget class="QPushButton" name="contentDetectManualBtn">
            <property name="text">
             <string>Manual</string>
            </property>
@@ -263,8 +279,62 @@
            <property name="autoExclusive">
             <bool>true</bool>
            </property>
-          </widget>
-         </item>
+           </widget>
+          </item>
+          <item row="2" column="0" colspan="3">
+           <widget class="QGroupBox" name="accurateContentOptions">
+            <property name="title">
+             <string>Accurate options</string>
+            </property>
+            <layout class="QVBoxLayout" name="accurateContentOptionsLayout">
+             <property name="spacing">
+              <number>4</number>
+             </property>
+             <property name="leftMargin">
+              <number>9</number>
+             </property>
+             <property name="topMargin">
+              <number>6</number>
+             </property>
+             <property name="rightMargin">
+              <number>9</number>
+             </property>
+             <property name="bottomMargin">
+              <number>9</number>
+             </property>
+             <item>
+              <widget class="QCheckBox" name="includeHeaderTitleCheckBox">
+               <property name="text">
+                <string>Include header / title</string>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QCheckBox" name="includePageNumberCheckBox">
+               <property name="text">
+                <string>Include page number</string>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="redetectContentBtn">
+               <property name="toolTip">
+                <string>Run Accurate detection again on only this page.</string>
+               </property>
+               <property name="text">
+                <string>Redetect this page</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
         </layout>
        </widget>
       </item>

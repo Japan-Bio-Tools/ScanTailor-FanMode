@@ -28,7 +28,10 @@ class Dependencies {
   explicit Dependencies(const QPolygonF& rotatedPageOutline,
                         AutoManualMode contentDetectionMode,
                         AutoManualMode pageDetectionMode,
-                        bool fineTuneCorners);
+                        bool fineTuneCorners,
+                        bool accurateContentDetection = false,
+                        bool includeHeaderTitle = true,
+                        bool includePageNumber = true);
 
   explicit Dependencies(const QDomElement& depsEl);
 
@@ -51,7 +54,12 @@ class Dependencies {
    public:
     Params();
 
-    Params(AutoManualMode contentDetectionMode, AutoManualMode pageDetectionMode, bool fineTuneCorners);
+    Params(AutoManualMode contentDetectionMode,
+           AutoManualMode pageDetectionMode,
+           bool fineTuneCorners,
+           bool accurateContentDetection,
+           bool includeHeaderTitle,
+           bool includePageNumber);
 
     explicit Params(const QDomElement& el);
 
@@ -71,6 +79,9 @@ class Dependencies {
     AutoManualMode m_contentDetectionMode;
     AutoManualMode m_pageDetectionMode;
     bool m_fineTuneCorners;
+    bool m_accurateContentDetection;
+    bool m_includeHeaderTitle;
+    bool m_includePageNumber;
   };
 
   QPolygonF m_rotatedPageOutline;

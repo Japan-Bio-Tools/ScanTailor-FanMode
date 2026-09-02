@@ -6,6 +6,7 @@ set(sources
     TowardsLineTracer.cpp TowardsLineTracer.h
     TextLineTracer.cpp TextLineTracer.h
     TextLineRefiner.cpp TextLineRefiner.h
+    TableLineDistortionModelBuilder.cpp TableLineDistortionModelBuilder.h
     TopBottomEdgeTracer.cpp TopBottomEdgeTracer.h
     CylindricalSurfaceDewarper.cpp CylindricalSurfaceDewarper.h
     DewarpingPointMapper.cpp DewarpingPointMapper.h

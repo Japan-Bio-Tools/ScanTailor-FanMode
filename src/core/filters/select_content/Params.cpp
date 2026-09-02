@@ -8,7 +8,13 @@
 
 namespace select_content {
 Params::Params(const Dependencies& deps)
-    : m_deps(deps), m_contentDetectionMode(MODE_AUTO), m_pageDetectionMode(MODE_DISABLED), m_fineTuneCorners(false) {}
+    : m_deps(deps),
+      m_contentDetectionMode(MODE_AUTO),
+      m_pageDetectionMode(MODE_DISABLED),
+      m_fineTuneCorners(false),
+      m_accurateContentDetection(true),
+      m_includeHeaderTitle(true),
+      m_includePageNumber(true) {}
 
 Params::Params(const QRectF& contentRect,
                const QSizeF& contentSizeMm,
@@ -16,14 +22,20 @@ Params::Params(const QRectF& contentRect,
                const Dependencies& deps,
                const AutoManualMode contentDetectionMode,
                const AutoManualMode pageDetectionMode,
-               const bool fineTuneCorners)
+               const bool fineTuneCorners,
+               const bool accurateContentDetection,
+               const bool includeHeaderTitle,
+               const bool includePageNumber)
     : m_contentRect(contentRect),
       m_pageRect(pageRect),
       m_contentSizeMM(contentSizeMm),
       m_deps(deps),
       m_contentDetectionMode(contentDetectionMode),
       m_pageDetectionMode(pageDetectionMode),
-      m_fineTuneCorners(fineTuneCorners) {}
+      m_fineTuneCorners(fineTuneCorners),
+      m_accurateContentDetection(accurateContentDetection),
+      m_includeHeaderTitle(includeHeaderTitle),
+      m_includePageNumber(includePageNumber) {}
 
 Params::Params(const QDomElement& filterEl)
     : m_contentRect(XmlUnmarshaller::rectF(filterEl.namedItem("content-rect").toElement())),
@@ -32,7 +44,11 @@ Params::Params(const QDomElement& filterEl)
       m_deps(filterEl.namedItem("dependencies").toElement()),
       m_contentDetectionMode(stringToAutoManualMode(filterEl.attribute("contentDetectionMode"))),
       m_pageDetectionMode(stringToAutoManualMode(filterEl.attribute("pageDetectionMode"))),
-      m_fineTuneCorners(filterEl.attribute("fineTuneCorners") == "1") {}
+      m_fineTuneCorners(filterEl.attribute("fineTuneCorners") == "1"),
+      // Preserve the standard detector for projects saved before Accurate mode existed.
+      m_accurateContentDetection(filterEl.attribute("accurateContentDetection", "0") == "1"),
+      m_includeHeaderTitle(filterEl.attribute("includeHeaderTitle", "1") == "1"),
+      m_includePageNumber(filterEl.attribute("includePageNumber", "1") == "1") {}
 
 Params::~Params() = default;
 
@@ -43,6 +59,9 @@ QDomElement Params::toXml(QDomDocument& doc, const QString& name) const {
   el.setAttribute("contentDetectionMode", autoManualModeToString(m_contentDetectionMode));
   el.setAttribute("pageDetectionMode", autoManualModeToString(m_pageDetectionMode));
   el.setAttribute("fineTuneCorners", m_fineTuneCorners ? "1" : "0");
+  el.setAttribute("accurateContentDetection", m_accurateContentDetection ? "1" : "0");
+  el.setAttribute("includeHeaderTitle", m_includeHeaderTitle ? "1" : "0");
+  el.setAttribute("includePageNumber", m_includePageNumber ? "1" : "0");
   el.appendChild(marshaller.rectF(m_contentRect, "content-rect"));
   el.appendChild(marshaller.rectF(m_pageRect, "page-rect"));
   el.appendChild(marshaller.sizeF(m_contentSizeMM, "content-size-mm"));

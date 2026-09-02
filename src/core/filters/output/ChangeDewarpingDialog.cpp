@@ -37,6 +37,12 @@ ChangeDewarpingDialog::ChangeDewarpingDialog(QWidget* parent,
     case AUTO:
       ui.autoRB->setChecked(true);
       break;
+    case AUTO_BOOK:
+      ui.autoBookRB->setChecked(true);
+      break;
+    case AUTO_TABLE:
+      ui.autoTableRB->setChecked(true);
+      break;
     case MARGINAL:
       ui.marginalRB->setChecked(true);
       break;
@@ -48,6 +54,8 @@ ChangeDewarpingDialog::ChangeDewarpingDialog(QWidget* parent,
   ui.dewarpingPostDeskewCB->setChecked(dewarpingOptions.needPostDeskew());
   connect(ui.offRB, &QRadioButton::clicked, var(m_dewarpingMode) = OFF);
   connect(ui.autoRB, &QRadioButton::clicked, var(m_dewarpingMode) = AUTO);
+  connect(ui.autoBookRB, &QRadioButton::clicked, var(m_dewarpingMode) = AUTO_BOOK);
+  connect(ui.autoTableRB, &QRadioButton::clicked, var(m_dewarpingMode) = AUTO_TABLE);
   connect(ui.manualRB, &QRadioButton::clicked, var(m_dewarpingMode) = MANUAL);
   connect(ui.marginalRB, &QRadioButton::clicked, var(m_dewarpingMode) = MARGINAL);
 

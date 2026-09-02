@@ -30,7 +30,10 @@ class Params {
          const Dependencies& deps,
          AutoManualMode contentDetectionMode,
          AutoManualMode pageDetectionMode,
-         bool fineTuneCorners);
+         bool fineTuneCorners,
+         bool accurateContentDetection = true,
+         bool includeHeaderTitle = true,
+         bool includePageNumber = true);
 
   explicit Params(const QDomElement& filterEl);
 
@@ -52,6 +55,12 @@ class Params {
 
   bool isFineTuningEnabled() const;
 
+  bool isAccurateContentDetectionEnabled() const;
+
+  bool isHeaderTitleIncluded() const;
+
+  bool isPageNumberIncluded() const;
+
   void setContentDetectionMode(AutoManualMode mode);
 
   void setPageDetectionMode(AutoManualMode mode);
@@ -66,6 +75,12 @@ class Params {
 
   void setFineTuneCornersEnabled(bool fineTuneCorners);
 
+  void setAccurateContentDetectionEnabled(bool enabled);
+
+  void setHeaderTitleIncluded(bool included);
+
+  void setPageNumberIncluded(bool included);
+
  private:
   QRectF m_contentRect;
   QRectF m_pageRect;
@@ -74,6 +89,9 @@ class Params {
   AutoManualMode m_contentDetectionMode;
   AutoManualMode m_pageDetectionMode;
   bool m_fineTuneCorners;
+  bool m_accurateContentDetection;
+  bool m_includeHeaderTitle;
+  bool m_includePageNumber;
 };
 
 
@@ -105,6 +123,18 @@ inline bool Params::isFineTuningEnabled() const {
   return m_fineTuneCorners;
 }
 
+inline bool Params::isAccurateContentDetectionEnabled() const {
+  return m_accurateContentDetection;
+}
+
+inline bool Params::isHeaderTitleIncluded() const {
+  return m_includeHeaderTitle;
+}
+
+inline bool Params::isPageNumberIncluded() const {
+  return m_includePageNumber;
+}
+
 inline void Params::setContentDetectionMode(const AutoManualMode mode) {
   m_contentDetectionMode = mode;
 }
@@ -131,6 +161,18 @@ inline void Params::setDependencies(const Dependencies& deps) {
 
 inline void Params::setFineTuneCornersEnabled(bool fineTuneCorners) {
   m_fineTuneCorners = fineTuneCorners;
+}
+
+inline void Params::setAccurateContentDetectionEnabled(bool enabled) {
+  m_accurateContentDetection = enabled;
+}
+
+inline void Params::setHeaderTitleIncluded(bool included) {
+  m_includeHeaderTitle = included;
+}
+
+inline void Params::setPageNumberIncluded(bool included) {
+  m_includePageNumber = included;
 }
 }  // namespace select_content
 #endif  // ifndef SCANTAILOR_SELECT_CONTENT_PARAMS_H_

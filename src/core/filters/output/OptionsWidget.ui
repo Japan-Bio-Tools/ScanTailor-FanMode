@@ -1693,6 +1693,57 @@
        </layout>
       </item>
       <item>
+       <layout class="QFormLayout" name="dewarpingEditModeLayout">
+        <item row="0" column="0">
+         <widget class="QLabel" name="dewarpingEditModeLabel">
+          <property name="text">
+           <string>Manual controls:</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="1">
+         <widget class="QComboBox" name="dewarpingEditModeCombo">
+          <property name="toolTip">
+           <string>Simple mode uses three large points on an upper text line and three on a lower text line. Advanced mode shows the complete editable grid.</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="liveDewarpingPreviewCB">
+        <property name="toolTip">
+         <string>Replaces the central page image with a fast corrected preview while you edit. The final output is rendered at full quality.</string>
+        </property>
+        <property name="text">
+         <string>Preview correction on this page</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="resetDewarpingButton">
+        <property name="toolTip">
+         <string>Return this page to a straight, neutral grid without disabling dewarping.</string>
+        </property>
+        <property name="text">
+         <string>Reset to Normal Grid</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="redetectDewarpingButton">
+        <property name="toolTip">
+         <string>Clear the cached dewarping result and automatically detect this page again. If the current mode is not automatic, Book text auto will be used.</string>
+        </property>
+        <property name="text">
+         <string>Re-detect This Page</string>
+        </property>
+       </widget>
+      </item>
+      <item>
        <layout class="QHBoxLayout" name="horizontalLayout_8">
         <item>
          <spacer name="horizontalSpacer_17">

@@ -2,11 +2,13 @@ set(sources
     main.cpp
     TestContentSpanFinder.cpp
     TestDeskewParams.cpp
+    TestDewarpingOptions.cpp
     TestObliqueFinder.cpp
     TestOcrInputStager.cpp
     TestOcrSettings.cpp
     TestOutputCover.cpp
     TestImageId.cpp
+    TestImagePdfWriter.cpp
     TestMargins.cpp
     TestPageLayoutPageSize.cpp
     TestPageId.cpp
@@ -14,8 +16,10 @@ set(sources
     TestPageSequence.cpp
     TestProjectReaderCompatibility.cpp
     TestRtlPdfFixer.cpp
+    TestSelectContentAccurate.cpp
     TestSelectContentApply.cpp
     TestSmartFilenameOrdering.cpp
+    TestTableLineDistortionModelBuilder.cpp
     TestUnits.cpp)
 
 add_executable(core_tests ${sources})

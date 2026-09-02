@@ -27,6 +27,7 @@
 #include <Scale.h>
 #include <SeedFill.h>
 #include <TextLineTracer.h>
+#include <TableLineDistortionModelBuilder.h>
 #include <TopBottomEdgeTracer.h>
 #include <Transform.h>
 #include <core/ApplicationSettings.h>
@@ -49,7 +50,9 @@
 #include <QTransform>
 #include <boost/bind/bind.hpp>
 #include <boost/function.hpp>
+#include <algorithm>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 
 #include "ColorParams.h"
@@ -205,7 +208,12 @@ class OutputGenerator::Processor {
 
   QImage transformToWorkingCs(bool normalize) const;
 
-  DistortionModel buildAutoDistortionModel(const GrayImage& warpedGrayOutput, const QTransform& toOriginal) const;
+  DistortionModel buildAutoDistortionModel(const GrayImage& warpedGrayOutput,
+                                           const QTransform& toOriginal,
+                                           bool includePageEdges) const;
+
+  DistortionModel buildTableDistortionModel(const GrayImage& warpedGrayOutput,
+                                            const QTransform& toOriginal) const;
 
   DistortionModel buildMarginalDistortionModel() const;
 
@@ -1175,6 +1183,55 @@ inline float vertBorderSkewAngle(const QPointF& top, const QPointF& bottom) {
       std::abs(std::atan((bottom.x() - top.x()) / (bottom.y() - top.y())) * 180.0 / constants::PI));
 }
 
+double maxDeviationFromChord(const Curve& curve) {
+  const std::vector<QPointF>& polyline = curve.polyline();
+  if (polyline.size() < 3) {
+    return 0.0;
+  }
+
+  const QPointF start = polyline.front();
+  const QPointF chord = polyline.back() - start;
+  const double chordLength = std::hypot(chord.x(), chord.y());
+  if (chordLength < 1e-6) {
+    return std::numeric_limits<double>::infinity();
+  }
+
+  double maxDeviation = 0.0;
+  for (const QPointF& point : polyline) {
+    const QPointF delta = point - start;
+    const double cross = chord.x() * delta.y() - chord.y() * delta.x();
+    maxDeviation = std::max(maxDeviation, std::fabs(cross) / chordLength);
+  }
+  return maxDeviation;
+}
+
+bool isConservativeAutoModel(const DistortionModel& model) {
+  if (!model.isValid()) {
+    return false;
+  }
+
+  const std::vector<QPointF>& top = model.topCurve().polyline();
+  const std::vector<QPointF>& bottom = model.bottomCurve().polyline();
+  const double leftHeight = QLineF(top.front(), bottom.front()).length();
+  const double rightHeight = QLineF(top.back(), bottom.back()).length();
+  const double referenceHeight = 0.5 * (leftHeight + rightHeight);
+  if (referenceHeight < 1.0) {
+    return false;
+  }
+
+  // Avoid accepting a model whose page height collapses at one side.
+  if (std::min(leftHeight, rightHeight) < 0.45 * std::max(leftHeight, rightHeight)) {
+    return false;
+  }
+
+  // Strongly curved models are more likely to be caused by a heading box,
+  // spiral binding, or picture edge than by an actual book surface. Manual
+  // mode remains available for pages that genuinely exceed this limit.
+  const double maxAllowedBow = std::max(4.0, referenceHeight * 0.18);
+  return (maxDeviationFromChord(model.topCurve()) <= maxAllowedBow)
+         && (maxDeviationFromChord(model.bottomCurve()) <= maxAllowedBow);
+}
+
 QImage smoothToGrayscale(const QImage& src, const Dpi& dpi) {
   const int minDpi = std::min(dpi.horizontal(), dpi.vertical());
   int window;
@@ -1263,7 +1320,9 @@ std::unique_ptr<OutputImage> OutputGenerator::Processor::processImpl(ZoneSet& pi
   m_outsideBackgroundColor = BackgroundColorCalculator::calcDominantBackgroundColor(
       m_colorOriginal ? m_inputOrigImage : m_inputGrayImage, m_outCropAreaInOriginalCs);
 
-  if ((m_dewarpingOptions.dewarpingMode() == AUTO) || (m_dewarpingOptions.dewarpingMode() == MARGINAL)
+  if ((m_dewarpingOptions.dewarpingMode() == AUTO) || (m_dewarpingOptions.dewarpingMode() == AUTO_BOOK)
+      || (m_dewarpingOptions.dewarpingMode() == AUTO_TABLE)
+      || (m_dewarpingOptions.dewarpingMode() == MARGINAL)
       || ((m_dewarpingOptions.dewarpingMode() == MANUAL) && distortionModel.isValid())) {
     return processWithDewarping(pictureZones, fillZones, distortionModel, depthPerception, autoPictureMask,
                                 specklesImage);
@@ -1636,10 +1695,13 @@ std::unique_ptr<OutputImage> OutputGenerator::Processor::processWithDewarping(Zo
     m_status.throwIfCancelled();
   }
 
-  if (m_dewarpingOptions.dewarpingMode() == AUTO) {
-    distortionModel = buildAutoDistortionModel(warpedGrayOutput, workingToOrig);
+  if ((m_dewarpingOptions.dewarpingMode() == AUTO) || (m_dewarpingOptions.dewarpingMode() == AUTO_BOOK)) {
+    distortionModel = buildAutoDistortionModel(warpedGrayOutput, workingToOrig,
+                                               m_dewarpingOptions.dewarpingMode() == AUTO);
   } else if (m_dewarpingOptions.dewarpingMode() == MARGINAL) {
     distortionModel = buildMarginalDistortionModel();
+  } else if (m_dewarpingOptions.dewarpingMode() == AUTO_TABLE) {
+    distortionModel = buildTableDistortionModel(warpedGrayOutput, workingToOrig);
   }
   warpedGrayOutput = GrayImage();  // Save memory.
 
@@ -2590,16 +2652,54 @@ QImage OutputGenerator::Processor::transformToWorkingCs(bool normalize) const {
 }
 
 DistortionModel OutputGenerator::Processor::buildAutoDistortionModel(const GrayImage& warpedGrayOutput,
-                                                                     const QTransform& toOriginal) const {
-  DistortionModelBuilder modelBuilder(Vec2d(0, 1));
+                                                                     const QTransform& toOriginal,
+                                                                     const bool includePageEdges) const {
+  struct TraceAttempt {
+    TextLineTracer::TraceResult traceResult;
+    DistortionModel distortionModel;
+    double analysisScale;
+  };
 
-  TextLineTracer::trace(warpedGrayOutput, m_dpi, m_contentRectInWorkingCs, modelBuilder, m_status, m_dbg);
-  modelBuilder.transform(toOriginal);
+  const auto traceAtScale = [&](const double analysisScale, DebugImages* dbg) {
+    DistortionModelBuilder modelBuilder(Vec2d(0, 1));
+    const Dpi analysisDpi(std::max(1, qRound(m_dpi.horizontal() * analysisScale)),
+                          std::max(1, qRound(m_dpi.vertical() * analysisScale)));
+    const TextLineTracer::TraceResult traceResult
+        = TextLineTracer::trace(warpedGrayOutput, analysisDpi, m_contentRectInWorkingCs, modelBuilder, m_status, dbg);
+    modelBuilder.transform(toOriginal);
 
-  TopBottomEdgeTracer::trace(m_inputGrayImage, modelBuilder.verticalBounds(), modelBuilder, m_status, m_dbg);
+    if (includePageEdges) {
+      TopBottomEdgeTracer::trace(m_inputGrayImage, modelBuilder.verticalBounds(), modelBuilder, m_status, dbg);
+    }
 
-  DistortionModel distortionModel = modelBuilder.tryBuildModel(m_dbg, &m_inputGrayImage.toQImage());
-  if (!distortionModel.isValid()) {
+    return TraceAttempt{traceResult, modelBuilder.tryBuildModel(dbg, &m_inputGrayImage.toQImage()), analysisScale};
+  };
+
+  TraceAttempt attempt(traceAtScale(1.0, m_dbg));
+  auto attemptIsReliable = [&](const TraceAttempt& candidate) {
+    return (includePageEdges || candidate.traceResult.isReliableForBookPage())
+           && isConservativeAutoModel(candidate.distortionModel);
+  };
+
+  // Full-resolution scans, and Arabic text in particular, may contain fine
+  // connected strokes and diacritics that fragment at the normal analysis
+  // scale. A second, smaller analysis copy joins those strokes while all
+  // returned points are still mapped back to the full-resolution page.
+  // Output resolution and quality are therefore not changed.
+  if (!includePageEdges && !attemptIsReliable(attempt)) {
+    TraceAttempt reducedScaleAttempt(traceAtScale(2.0, nullptr));
+    qDebug() << "Dewarping book auto retry: primary accepted" << attempt.traceResult.acceptedLineCount
+             << "reduced-scale accepted" << reducedScaleAttempt.traceResult.acceptedLineCount;
+    if (attemptIsReliable(reducedScaleAttempt)) {
+      attempt = std::move(reducedScaleAttempt);
+    }
+  }
+
+  DistortionModel distortionModel(attempt.distortionModel);
+  if (!attemptIsReliable(attempt)) {
+    qDebug() << "Dewarping auto fallback: candidates" << attempt.traceResult.candidateLineCount << "accepted"
+             << attempt.traceResult.acceptedLineCount << "analysis scale" << attempt.analysisScale
+             << "include page edges" << includePageEdges;
     setupTrivialDistortionModel(distortionModel);
   }
 
@@ -2644,7 +2744,7 @@ DistortionModel OutputGenerator::Processor::buildAutoDistortionModel(const GrayI
 
         QPointF pt(topX, bottomPolyline.front().y());
 
-        newBottomPolyline.push_back(pt);
+        newBottomPolyline.push_back(invTransform.map(pt));
 
         for (auto i : bottomPolyline) {
           newBottomPolyline.push_back(invTransform.map(i));
@@ -2656,13 +2756,13 @@ DistortionModel OutputGenerator::Processor::buildAutoDistortionModel(const GrayI
 
         QPointF pt(bottomX, topPolyline.front().y());
 
-        newTopPolyline.push_back(pt);
+        newTopPolyline.push_back(invTransform.map(pt));
 
         for (auto i : topPolyline) {
           newTopPolyline.push_back(invTransform.map(i));
         }
 
-        distortionModel.setBottomCurve(Curve(newTopPolyline));
+        distortionModel.setTopCurve(Curve(newTopPolyline));
       }
     }
   } else {
@@ -2684,7 +2784,7 @@ DistortionModel OutputGenerator::Processor::buildAutoDistortionModel(const GrayI
           newBottomPolyline.push_back(invTransform.map(i));
         }
 
-        newBottomPolyline.push_back(pt);
+        newBottomPolyline.push_back(invTransform.map(pt));
 
         distortionModel.setBottomCurve(Curve(newBottomPolyline));
       } else {
@@ -2696,11 +2796,45 @@ DistortionModel OutputGenerator::Processor::buildAutoDistortionModel(const GrayI
           newTopPolyline.push_back(invTransform.map(i));
         }
 
-        newTopPolyline.push_back(pt);
+        newTopPolyline.push_back(invTransform.map(pt));
 
-        distortionModel.setBottomCurve(Curve(newTopPolyline));
+        distortionModel.setTopCurve(Curve(newTopPolyline));
       }
     }
+  }
+  if (!isConservativeAutoModel(distortionModel)) {
+    qDebug() << "Dewarping auto fallback after border correction";
+    setupTrivialDistortionModel(distortionModel);
+  }
+  return distortionModel;
+}
+
+DistortionModel OutputGenerator::Processor::buildTableDistortionModel(const GrayImage& warpedGrayOutput,
+                                                                       const QTransform& toOriginal) const {
+  const TableLineDistortionModelBuilder::Result detection
+      = TableLineDistortionModelBuilder::build(warpedGrayOutput, m_contentRectInWorkingCs);
+  m_status.throwIfCancelled();
+
+  DistortionModel distortionModel;
+  if (detection.reliable) {
+    std::vector<QPointF> top(detection.model.topCurve().polyline());
+    std::vector<QPointF> bottom(detection.model.bottomCurve().polyline());
+    for (QPointF& point : top) {
+      point = toOriginal.map(point);
+    }
+    for (QPointF& point : bottom) {
+      point = toOriginal.map(point);
+    }
+    distortionModel.setTopCurve(Curve(top));
+    distortionModel.setBottomCurve(Curve(bottom));
+  }
+
+  if (!detection.reliable || !isConservativeAutoModel(distortionModel)) {
+    qDebug() << "Dewarping table auto fallback: candidates" << detection.candidateLineCount << "accepted"
+             << detection.acceptedLineCount;
+    setupTrivialDistortionModel(distortionModel);
+  } else {
+    qDebug() << "Dewarping table auto accepted" << detection.acceptedLineCount << "aligned rules";
   }
   return distortionModel;
 }
@@ -2759,11 +2893,11 @@ DistortionModel OutputGenerator::Processor::buildMarginalDistortionModel() const
 
   if ((m_pageId.subPage() == PageId::SINGLE_PAGE) || (m_pageId.subPage() == PageId::LEFT_PAGE)) {
     for (int i = 29 - maxRedPoints; i < 29; i++) {
-      bottomSpline.appendControlPoint(topLine.pointAt((float) i / 29.0), 1);
+      bottomSpline.appendControlPoint(bottomLine.pointAt((float) i / 29.0), 1);
     }
   } else {
     for (int i = 1; i <= maxRedPoints; i++) {
-      bottomSpline.appendControlPoint(topLine.pointAt((float) i / 29.0), 1);
+      bottomSpline.appendControlPoint(bottomLine.pointAt((float) i / 29.0), 1);
     }
   }
 

@@ -21,12 +21,30 @@ class SEDM;
 }  // namespace imageproc
 
 namespace select_content {
+struct ContentDetectionOptions {
+  bool accurate = false;
+  bool includeHeaderTitle = true;
+  bool includePageNumber = true;
+};
+
 class ContentBoxFinder {
  public:
   static QRectF findContentBox(const TaskStatus& status,
                                const FilterData& data,
                                const QRectF& pageRect,
+                               const ContentDetectionOptions& options = ContentDetectionOptions(),
                                DebugImages* dbg = nullptr);
+
+  /**
+   * Expands a standard content rectangle with plausible text lines from the
+   * page's upper and lower edge bands. Coordinates are image pixels.
+   * Exposed for deterministic regression tests of Accurate mode.
+   */
+  static QRect expandContentBoxForEdgeText(const imageproc::BinaryImage& content,
+                                           const QRect& pageRect,
+                                           const QRect& standardContentRect,
+                                           bool includeHeaderTitle,
+                                           bool includePageNumber);
 
  private:
   class Garbage;

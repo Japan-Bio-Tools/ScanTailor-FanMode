@@ -66,6 +66,8 @@ DefaultParamsDialog::DefaultParamsDialog(QWidget* parent)
 
   dewarpingModeCB->addItem(tr("Off"), OFF);
   dewarpingModeCB->addItem(tr("Auto"), AUTO);
+  dewarpingModeCB->addItem(tr("Book text auto"), AUTO_BOOK);
+  dewarpingModeCB->addItem(tr("Tables / technical pages"), AUTO_TABLE);
   dewarpingModeCB->addItem(tr("Manual"), MANUAL);
   dewarpingModeCB->addItem(tr("Marginal"), MARGINAL);
 

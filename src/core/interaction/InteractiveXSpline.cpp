@@ -136,10 +136,10 @@ void InteractiveXSpline::onMousePressEvent(QMouseEvent* event, InteractionState&
   }
 }
 
-void InteractiveXSpline::removeControlPointUnderMouse() {
+bool InteractiveXSpline::removeControlPointUnderMouse() {
   InteractionState& interaction = m_imageView.interactionState();
   if (interaction.captured()) {
-    return;
+    return false;
   }
 
   const int numControlPoints = m_spline.numControlPoints();
@@ -150,9 +150,10 @@ void InteractiveXSpline::removeControlPointUnderMouse() {
       m_spline.eraseControlPoint(i);
       setSpline(m_spline);
       interaction.setRedrawRequested(true);
-      break;
+      return true;
     }
   }
+  return false;
 }
 
 QPointF InteractiveXSpline::controlPointPosition(int idx) const {

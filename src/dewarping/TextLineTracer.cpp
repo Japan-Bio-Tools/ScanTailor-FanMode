@@ -22,6 +22,7 @@
 #include <boost/lambda/bind.hpp>
 #include <boost/lambda/if.hpp>
 #include <boost/lambda/lambda.hpp>
+#include <algorithm>
 #include <cmath>
 
 #include "DebugImages.h"
@@ -39,12 +40,13 @@
 using namespace imageproc;
 
 namespace dewarping {
-void TextLineTracer::trace(const GrayImage& input,
-                           const Dpi& dpi,
-                           const QRect& contentRect,
-                           DistortionModelBuilder& output,
-                           const TaskStatus& status,
-                           DebugImages* dbg) {
+TextLineTracer::TraceResult TextLineTracer::trace(const GrayImage& input,
+                                                  const Dpi& dpi,
+                                                  const QRect& contentRect,
+                                                  DistortionModelBuilder& output,
+                                                  const TaskStatus& status,
+                                                  DebugImages* dbg) {
+  TraceResult result;
   GrayImage downscaled(downscale(input, dpi));
   if (dbg) {
     dbg->add(downscaled, "downscaled");
@@ -77,7 +79,8 @@ void TextLineTracer::trace(const GrayImage& input,
   }
 
   std::list<std::vector<QPointF>> polylines;
-  extractTextLines(polylines, stretchGrayRange(downscaled), vertBounds, dbg);
+  extractTextLines(polylines, stretchGrayRange(downscaled), downscaledDpi, vertBounds, dbg);
+  result.candidateLineCount = static_cast<int>(polylines.size());
   if (dbg) {
     dbg->add(visualizePolylines(downscaled, polylines), "traced");
   }
@@ -97,6 +100,7 @@ void TextLineTracer::trace(const GrayImage& input,
   refiner.refine(polylines, /*iterations=*/100, dbg);
 
   filterEdgyCurves(polylines);
+  result.acceptedLineCount = static_cast<int>(polylines.size());
   if (dbg) {
     dbg->add(visualizePolylines(downscaled, polylines), "filtered2");
   }
@@ -114,6 +118,7 @@ void TextLineTracer::trace(const GrayImage& input,
     }
     output.addHorizontalCurve(polyline);
   }
+  return result;
 }  // TextLineTracer::trace
 
 GrayImage TextLineTracer::downscale(const GrayImage& input, const Dpi& dpi) {
@@ -266,6 +271,7 @@ void TextLineTracer::filterEdgyCurves(std::list<std::vector<QPointF>>& polylines
 
 void TextLineTracer::extractTextLines(std::list<std::vector<QPointF>>& out,
                                       const imageproc::GrayImage& image,
+                                      const Dpi& dpi,
                                       const std::pair<QLineF, QLineF>& bounds,
                                       DebugImages* dbg) {
   using namespace boost::lambda;
@@ -304,7 +310,28 @@ void TextLineTracer::extractTextLines(std::list<std::vector<QPointF>>& out,
 
   float max = 0;
   rasterOpGeneric(mainGrid.data(), mainGrid.stride(), size, if_then(_1 > var(max), var(max) = _1));
-  const float threshold = max * 15.0f / 255.0f;
+
+  // A single dark banner, page edge, or binding hole can otherwise define the
+  // global maximum and hide the much weaker strokes of ordinary body text.
+  // Use a high percentile as a robust peak while retaining the old maximum as
+  // a ceiling. Sampling every other pixel keeps this inexpensive at 200 DPI.
+  std::vector<float> positiveSamples;
+  positiveSamples.reserve((width * height) / 8);
+  for (int y = 0; y < height; y += 2) {
+    const float* line = mainGrid.data() + y * mainGrid.stride();
+    for (int x = 0; x < width; x += 2) {
+      if (line[x] > 0) {
+        positiveSamples.push_back(line[x]);
+      }
+    }
+  }
+  float robustPeak = max;
+  if (positiveSamples.size() >= 100) {
+    const size_t percentileIdx = static_cast<size_t>(0.995 * (positiveSamples.size() - 1));
+    std::nth_element(positiveSamples.begin(), positiveSamples.begin() + percentileIdx, positiveSamples.end());
+    robustPeak = positiveSamples[percentileIdx];
+  }
+  const float threshold = std::min(max, std::max(robustPeak, max * 0.25f)) * 15.0f / 255.0f;
 
   BinaryImage initialBinarization(image.size());
   rasterOpGeneric(initialBinarization, mainGrid.data(), mainGrid.stride(),
@@ -345,7 +372,12 @@ void TextLineTracer::extractTextLines(std::list<std::vector<QPointF>>& out,
   }
 
   Grid<float>().swap(auxGrid);  // Save memory.
-  initialBinarization = closeWithObstacles(initialBinarization, obstacles, QSize(21, 21));
+  // Arabic diacritics and joined letter forms need stronger horizontal
+  // grouping than vertical grouping. Keeping the kernel physically scaled
+  // also makes the result stable for unusual source DPI values.
+  const int closeWidth = qBound(17, qRound(dpi.horizontal() * 0.14), 35);
+  const int closeHeight = qBound(7, qRound(dpi.vertical() * 0.05), 15);
+  initialBinarization = closeWithObstacles(initialBinarization, obstacles, QSize(closeWidth, closeHeight));
   if (dbg) {
     dbg->add(initialBinarization, "initial_closed");
   }

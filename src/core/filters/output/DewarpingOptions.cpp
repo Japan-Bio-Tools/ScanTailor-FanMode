@@ -27,7 +27,8 @@ QDomElement DewarpingOptions::toXml(QDomDocument& doc, const QString& name) cons
 }
 
 bool DewarpingOptions::operator==(const DewarpingOptions& other) const {
-  return (m_mode == other.m_mode) && (m_needPostDeskew == other.m_needPostDeskew);
+  return (m_mode == other.m_mode) && (m_needPostDeskew == other.m_needPostDeskew)
+         && (m_postDeskewAngle == other.m_postDeskewAngle);
 }
 
 bool DewarpingOptions::operator!=(const DewarpingOptions& other) const {
@@ -37,10 +38,14 @@ bool DewarpingOptions::operator!=(const DewarpingOptions& other) const {
 DewarpingMode DewarpingOptions::parseDewarpingMode(const QString& str) {
   if (str == "auto") {
     return AUTO;
+  } else if (str == "auto_book") {
+    return AUTO_BOOK;
   } else if (str == "manual") {
     return MANUAL;
   } else if (str == "marginal") {
     return MARGINAL;
+  } else if (str == "auto_table") {
+    return AUTO_TABLE;
   } else {
     return OFF;
   }
@@ -52,10 +57,14 @@ QString DewarpingOptions::formatDewarpingMode(DewarpingMode mode) {
       return "off";
     case AUTO:
       return "auto";
+    case AUTO_BOOK:
+      return "auto_book";
     case MANUAL:
       return "manual";
     case MARGINAL:
       return "marginal";
+    case AUTO_TABLE:
+      return "auto_table";
   }
 
   assert(!"Unreachable");

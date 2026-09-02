@@ -44,20 +44,22 @@ void OptionsWidget::postUpdateUI(const UiData& uiData) {
 
   m_uiData = uiData;
 
-  updateContentModeIndication(uiData.contentDetectionMode());
+  updateContentModeIndication(uiData.contentDetectionMode(), uiData.isAccurateContentDetectionEnabled());
   updatePageModeIndication(uiData.pageDetectionMode());
 
   contentBoxGroup->setEnabled(true);
   pageBoxGroup->setEnabled(true);
 
   updatePageDetectOptionsDisplay();
+  updateAccurateOptionsDisplay();
   updatePageRectSize(m_uiData.pageRect().size());
 }
 
 void OptionsWidget::manualContentRectSet(const QRectF& contentRect) {
   m_uiData.setContentRect(contentRect);
   m_uiData.setContentDetectionMode(MODE_MANUAL);
-  updateContentModeIndication(MODE_MANUAL);
+  updateContentModeIndication(MODE_MANUAL, m_uiData.isAccurateContentDetectionEnabled());
+  updateAccurateOptionsDisplay();
 
   commitCurrentParams();
 
@@ -89,11 +91,56 @@ void OptionsWidget::updatePageRectSize(const QSizeF& size) {
 
 void OptionsWidget::contentDetectToggled(const AutoManualMode mode) {
   m_uiData.setContentDetectionMode(mode);
+  if (mode == MODE_AUTO) {
+    m_uiData.setAccurateContentDetectionEnabled(false);
+  }
+  updateContentModeIndication(mode, m_uiData.isAccurateContentDetectionEnabled());
+  updateAccurateOptionsDisplay();
   commitCurrentParams();
 
   if (mode != MODE_MANUAL) {
     emit reloadRequested();
   }
+}
+
+void OptionsWidget::accurateContentDetectToggled() {
+  m_uiData.setContentDetectionMode(MODE_AUTO);
+  m_uiData.setAccurateContentDetectionEnabled(true);
+  updateContentModeIndication(MODE_AUTO, true);
+  updateAccurateOptionsDisplay();
+  commitCurrentParams();
+  emit reloadRequested();
+}
+
+void OptionsWidget::accurateOptionsChanged() {
+  m_uiData.setHeaderTitleIncluded(includeHeaderTitleCheckBox->isChecked());
+  m_uiData.setPageNumberIncluded(includePageNumberCheckBox->isChecked());
+  commitCurrentParams();
+  if ((m_uiData.contentDetectionMode() == MODE_AUTO) && m_uiData.isAccurateContentDetectionEnabled()) {
+    emit reloadRequested();
+  }
+}
+
+void OptionsWidget::redetectContent() {
+  m_uiData.setContentDetectionMode(MODE_AUTO);
+  m_uiData.setAccurateContentDetectionEnabled(true);
+  m_uiData.setHeaderTitleIncluded(includeHeaderTitleCheckBox->isChecked());
+  m_uiData.setPageNumberIncluded(includePageNumberCheckBox->isChecked());
+  updateContentModeIndication(MODE_AUTO, true);
+  updateAccurateOptionsDisplay();
+  commitCurrentParams();
+
+  // Keep the current page box but deliberately make only the stored content
+  // dependency stale, so Task::process performs a fresh Accurate pass.
+  std::unique_ptr<Params> params = m_settings->getPageParams(m_pageId);
+  if (params) {
+    params->setDependencies(Dependencies(m_uiData.dependencies().rotatedPageOutline(), MODE_DISABLED,
+                                         m_uiData.pageDetectionMode(), m_uiData.isFineTuningCornersEnabled(), true,
+                                         m_uiData.isHeaderTitleIncluded(), m_uiData.isPageNumberIncluded()));
+    m_settings->setPageParams(m_pageId, *params);
+  }
+  emit invalidateThumbnail(m_pageId);
+  emit reloadRequested();
 }
 
 void OptionsWidget::pageDetectToggled(const AutoManualMode mode) {
@@ -119,10 +166,14 @@ void OptionsWidget::fineTuningChanged(bool checked) {
   }
 }
 
-void OptionsWidget::updateContentModeIndication(const AutoManualMode mode) {
+void OptionsWidget::updateContentModeIndication(const AutoManualMode mode, const bool accurate) {
   switch (mode) {
     case MODE_AUTO:
-      contentDetectAutoBtn->setChecked(true);
+      if (accurate) {
+        contentDetectAccurateBtn->setChecked(true);
+      } else {
+        contentDetectAutoBtn->setChecked(true);
+      }
       break;
     case MODE_MANUAL:
       contentDetectManualBtn->setChecked(true);
@@ -131,6 +182,16 @@ void OptionsWidget::updateContentModeIndication(const AutoManualMode mode) {
       contentDetectDisableBtn->setChecked(true);
       break;
   }
+}
+
+void OptionsWidget::updateAccurateOptionsDisplay() {
+  auto block = m_connectionManager.getScopedBlock();
+  includeHeaderTitleCheckBox->setChecked(m_uiData.isHeaderTitleIncluded());
+  includePageNumberCheckBox->setChecked(m_uiData.isPageNumberIncluded());
+  const bool accurateActive
+      = (m_uiData.contentDetectionMode() == MODE_AUTO) && m_uiData.isAccurateContentDetectionEnabled();
+  includeHeaderTitleCheckBox->setEnabled(accurateActive);
+  includePageNumberCheckBox->setEnabled(accurateActive);
 }
 
 void OptionsWidget::updatePageModeIndication(const AutoManualMode mode) {
@@ -169,7 +230,9 @@ void OptionsWidget::commitCurrentParams() {
   updateDependenciesIfNecessary();
 
   Params params(m_uiData.contentRect(), m_uiData.contentSizeMM(), m_uiData.pageRect(), m_uiData.dependencies(),
-                m_uiData.contentDetectionMode(), m_uiData.pageDetectionMode(), m_uiData.isFineTuningCornersEnabled());
+                m_uiData.contentDetectionMode(), m_uiData.pageDetectionMode(), m_uiData.isFineTuningCornersEnabled(),
+                m_uiData.isAccurateContentDetectionEnabled(), m_uiData.isHeaderTitleIncluded(),
+                m_uiData.isPageNumberIncluded());
   m_settings->setPageParams(m_pageId, params);
 }
 
@@ -205,7 +268,8 @@ void OptionsWidget::applySelection(const std::set<PageId>& pages, const bool app
 
   const Params params(m_uiData.contentRect(), m_uiData.contentSizeMM(), m_uiData.pageRect(), Dependencies(),
                       m_uiData.contentDetectionMode(), m_uiData.pageDetectionMode(),
-                      m_uiData.isFineTuningCornersEnabled());
+                      m_uiData.isFineTuningCornersEnabled(), m_uiData.isAccurateContentDetectionEnabled(),
+                      m_uiData.isHeaderTitleIncluded(), m_uiData.isPageNumberIncluded());
 
   for (const PageId& pageId : pages) {
     if (m_pageId == pageId) {
@@ -244,7 +308,9 @@ void OptionsWidget::applySelection(const std::set<PageId>& pages, const bool app
 
     if (applyContentBox && newParams.contentDetectionMode() == MODE_AUTO) {
       newParams.setDependencies(
-          Dependencies(QPolygonF(), MODE_DISABLED, newParams.pageDetectionMode(), newParams.isFineTuningEnabled()));
+          Dependencies(QPolygonF(), MODE_DISABLED, newParams.pageDetectionMode(), newParams.isFineTuningEnabled(),
+                       newParams.isAccurateContentDetectionEnabled(), newParams.isHeaderTitleIncluded(),
+                       newParams.isPageNumberIncluded()));
     }
 
     m_settings->setPageParams(pageId, newParams);
@@ -294,6 +360,7 @@ void OptionsWidget::setupUiConnections() {
   CONNECT(heightSpinBox, SIGNAL(valueChanged(double)), this, SLOT(dimensionsChangedLocally(double)));
   CONNECT(contentDetectAutoBtn, &QPushButton::pressed, this,
           boost::bind(&OptionsWidget::contentDetectToggled, this, MODE_AUTO));
+  CONNECT(contentDetectAccurateBtn, SIGNAL(pressed()), this, SLOT(accurateContentDetectToggled()));
   CONNECT(contentDetectManualBtn, &QPushButton::pressed, this,
           boost::bind(&OptionsWidget::contentDetectToggled, this, MODE_MANUAL));
   CONNECT(contentDetectDisableBtn, &QPushButton::pressed, this,
@@ -305,6 +372,9 @@ void OptionsWidget::setupUiConnections() {
   CONNECT(pageDetectDisableBtn, &QPushButton::pressed, this,
           boost::bind(&OptionsWidget::pageDetectToggled, this, MODE_DISABLED));
   CONNECT(fineTuneBtn, SIGNAL(toggled(bool)), this, SLOT(fineTuningChanged(bool)));
+  CONNECT(includeHeaderTitleCheckBox, SIGNAL(toggled(bool)), this, SLOT(accurateOptionsChanged()));
+  CONNECT(includePageNumberCheckBox, SIGNAL(toggled(bool)), this, SLOT(accurateOptionsChanged()));
+  CONNECT(redetectContentBtn, SIGNAL(clicked()), this, SLOT(redetectContent()));
   CONNECT(applyToBtn, SIGNAL(clicked()), this, SLOT(showApplyToDialog()));
 }
 
@@ -314,7 +384,12 @@ void OptionsWidget::setupUiConnections() {
 /*========================= OptionsWidget::UiData ======================*/
 
 OptionsWidget::UiData::UiData()
-    : m_contentDetectionMode(MODE_AUTO), m_pageDetectionMode(MODE_DISABLED), m_fineTuneCornersEnabled(false) {}
+    : m_contentDetectionMode(MODE_AUTO),
+      m_pageDetectionMode(MODE_DISABLED),
+      m_fineTuneCornersEnabled(false),
+      m_accurateContentDetectionEnabled(true),
+      m_headerTitleIncluded(true),
+      m_pageNumberIncluded(true) {}
 
 OptionsWidget::UiData::~UiData() = default;
 }  // namespace select_content

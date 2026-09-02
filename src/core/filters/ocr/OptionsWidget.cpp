@@ -20,6 +20,7 @@
 #include <QTemporaryDir>
 
 #include "AbstractRelinker.h"
+#include "ImagePdfWriter.h"
 #include "InputFileStager.h"
 #include "PageSequence.h"
 #include "ProjectPages.h"
@@ -28,6 +29,43 @@
 #include "filters/output/Filter.h"
 
 namespace ocr {
+namespace {
+bool copyPdfAtomically(const QString& sourcePath, const QString& targetPath, QString* errorMessage) {
+  QFile sourcePdf(sourcePath);
+  QSaveFile destinationPdf(targetPath);
+  if (!sourcePdf.open(QIODevice::ReadOnly) || !destinationPdf.open(QIODevice::WriteOnly)) {
+    if (errorMessage) {
+      *errorMessage = OptionsWidget::tr("Unable to write the selected PDF file.");
+    }
+    return false;
+  }
+  while (!sourcePdf.atEnd()) {
+    const QByteArray chunk = sourcePdf.read(1024 * 1024);
+    if (chunk.isEmpty() && sourcePdf.error() != QFileDevice::NoError) {
+      destinationPdf.cancelWriting();
+      if (errorMessage) {
+        *errorMessage = OptionsWidget::tr("Unable to read the temporary PDF file.");
+      }
+      return false;
+    }
+    if (destinationPdf.write(chunk) != chunk.size()) {
+      destinationPdf.cancelWriting();
+      if (errorMessage) {
+        *errorMessage = OptionsWidget::tr("Unable to write the selected PDF file.");
+      }
+      return false;
+    }
+  }
+  if (!destinationPdf.commit()) {
+    if (errorMessage) {
+      *errorMessage = OptionsWidget::tr("Unable to finish writing the PDF file.");
+    }
+    return false;
+  }
+  return true;
+}
+}  // namespace
+
 OptionsWidget::OptionsWidget(std::shared_ptr<Settings> settings,
                              std::shared_ptr<ProjectPages> pages,
                              std::weak_ptr<output::Filter> outputFilter)
@@ -148,12 +186,9 @@ void OptionsWidget::updateEstimate() {
   int missing = 0;
   qint64 sourceBytes = 0;
   const QStringList files = outputFiles(&missing, &sourceBytes);
-  exportPdfButton->setEnabled(hasLanguage && !files.isEmpty() && (missing == 0));
+  exportPdfButton->setEnabled(!files.isEmpty() && (missing == 0));
+  exportPdfButton->setText(hasLanguage ? tr("Export Searchable PDF...") : tr("Export PDF without OCR..."));
 
-  if (!hasLanguage) {
-    estimateLabel->setText(tr("Select at least one OCR language."));
-    return;
-  }
   if (files.isEmpty()) {
     estimateLabel->setText(tr("No final TIFF pages are available. Run Output first."));
     return;
@@ -165,9 +200,15 @@ void OptionsWidget::updateEstimate() {
 
   const qint64 estimatedBytes
       = qMax<qint64>(files.size() * 4096, qRound64(sourceBytes * m_settings->estimatedSizeRatio()));
-  estimateLabel->setText(tr("Estimated PDF size: about %1 (%2 pages)")
-                             .arg(formatBytes(estimatedBytes))
-                             .arg(files.size()));
+  if (hasLanguage) {
+    estimateLabel->setText(tr("Estimated searchable PDF size: about %1 (%2 pages)")
+                               .arg(formatBytes(estimatedBytes))
+                               .arg(files.size()));
+  } else {
+    estimateLabel->setText(tr("Estimated image-only PDF size: about %1 (%2 pages). No OCR text layer.")
+                               .arg(formatBytes(estimatedBytes))
+                               .arg(files.size()));
+  }
 }
 
 QString OptionsWidget::selectedLanguages() const {
@@ -191,7 +232,7 @@ QString OptionsWidget::selectedLanguages() const {
   return languages.join(QChar('+'));
 }
 
-QString OptionsWidget::suggestedPdfPath() const {
+QString OptionsWidget::suggestedPdfPath(const bool searchable) const {
   QSettings settings;
   QString directory = settings.value(QStringLiteral("ocr/lastExportDirectory")).toString();
   if (directory.isEmpty() || !QDir(directory).exists()) {
@@ -205,7 +246,8 @@ QString OptionsWidget::suggestedPdfPath() const {
   if (baseName.isEmpty()) {
     baseName = QStringLiteral("ScanTailor-FanMode");
   }
-  return QDir(directory).filePath(baseName + QStringLiteral("-searchable.pdf"));
+  return QDir(directory).filePath(baseName + (searchable ? QStringLiteral("-searchable.pdf")
+                                                        : QStringLiteral("-image-only.pdf")));
 }
 
 QString OptionsWidget::formatBytes(const qint64 bytes) {
@@ -249,18 +291,73 @@ void OptionsWidget::exportPdf() {
   }
 
   const QString languages = selectedLanguages();
-  if (languages.isEmpty()) {
-    QMessageBox::warning(this, tr("OCR & PDF"), tr("Select Arabic, English, or both."));
-    return;
-  }
+  const bool searchable = !languages.isEmpty();
 
-  QString targetPath = QFileDialog::getSaveFileName(this, tr("Export Searchable PDF"), suggestedPdfPath(),
-                                                     tr("PDF documents (*.pdf)"));
+  QString targetPath = QFileDialog::getSaveFileName(
+      this, searchable ? tr("Export Searchable PDF") : tr("Export PDF without OCR"),
+      suggestedPdfPath(searchable), tr("PDF documents (*.pdf)"));
   if (targetPath.isEmpty()) {
     return;
   }
   if (!targetPath.endsWith(QStringLiteral(".pdf"), Qt::CaseInsensitive)) {
     targetPath += QStringLiteral(".pdf");
+  }
+
+  if (!searchable) {
+    QTemporaryDir temporaryDirectory(
+        QDir(QDir::tempPath()).filePath(QStringLiteral("ScanTailor-FanMode-PDF-XXXXXX")));
+    if (!temporaryDirectory.isValid()) {
+      QMessageBox::warning(this, tr("PDF Export"), tr("Unable to create a temporary PDF folder."));
+      return;
+    }
+
+    const int pageCount = files.size();
+    QProgressDialog progress(tr("Adding page 1 of %1...").arg(pageCount), tr("Cancel"), 0, pageCount, this);
+    progress.setWindowTitle(tr("PDF Export without OCR"));
+    progress.setWindowModality(Qt::WindowModal);
+    progress.setMinimumDuration(0);
+    progress.setAutoClose(false);
+    progress.setAutoReset(false);
+
+    const QString temporaryPdf = QDir(temporaryDirectory.path()).filePath(QStringLiteral("image-only.pdf"));
+    QString exportError;
+    const bool created = ImagePdfWriter::write(
+        files, temporaryPdf, m_settings->jpegQuality(),
+        [&](const int completedPages, const int totalPages) {
+          progress.setValue(completedPages);
+          if (completedPages < totalPages) {
+            progress.setLabelText(tr("Adding page %1 of %2...").arg(completedPages + 1).arg(totalPages));
+          } else {
+            progress.setLabelText(tr("Finishing PDF..."));
+          }
+          QCoreApplication::processEvents();
+          return !progress.wasCanceled();
+        },
+        &exportError);
+    progress.hide();
+    if (!created) {
+      if (!exportError.isEmpty()) {
+        QMessageBox::warning(this, tr("PDF Export Failed"), exportError);
+      }
+      return;
+    }
+
+    QString copyError;
+    if (!copyPdfAtomically(temporaryPdf, targetPath, &copyError)) {
+      QMessageBox::warning(this, tr("PDF Export Failed"), copyError);
+      return;
+    }
+
+    QSettings appSettings;
+    appSettings.setValue(QStringLiteral("ocr/lastExportDirectory"), QFileInfo(targetPath).absolutePath());
+    const QString actualSize = formatBytes(QFileInfo(targetPath).size());
+    lastExportLabel->setText(tr("Last export: %1").arg(actualSize));
+    QMessageBox::information(this, tr("PDF Export Complete"),
+                             tr("Created an image-only %1-page PDF without OCR.\n\nActual size: %2\n%3")
+                                 .arg(files.size())
+                                 .arg(actualSize)
+                                 .arg(QDir::toNativeSeparators(targetPath)));
+    return;
   }
 
   const QString tesseractPath = findBundledTool(QStringLiteral("tesseract"));
@@ -420,27 +517,9 @@ void OptionsWidget::exportPdf() {
   }
   progress.hide();
 
-  QFile sourcePdf(correctedPdf);
-  QSaveFile destinationPdf(targetPath);
-  if (!sourcePdf.open(QIODevice::ReadOnly) || !destinationPdf.open(QIODevice::WriteOnly)) {
-    QMessageBox::warning(this, tr("OCR & PDF Export Failed"), tr("Unable to write the selected PDF file."));
-    return;
-  }
-  while (!sourcePdf.atEnd()) {
-    const QByteArray chunk = sourcePdf.read(1024 * 1024);
-    if (chunk.isEmpty() && sourcePdf.error() != QFileDevice::NoError) {
-      destinationPdf.cancelWriting();
-      QMessageBox::warning(this, tr("OCR & PDF Export Failed"), tr("Unable to read the temporary PDF file."));
-      return;
-    }
-    if (destinationPdf.write(chunk) != chunk.size()) {
-      destinationPdf.cancelWriting();
-      QMessageBox::warning(this, tr("OCR & PDF Export Failed"), tr("Unable to write the selected PDF file."));
-      return;
-    }
-  }
-  if (!destinationPdf.commit()) {
-    QMessageBox::warning(this, tr("OCR & PDF Export Failed"), tr("Unable to finish writing the PDF file."));
+  QString copyError;
+  if (!copyPdfAtomically(correctedPdf, targetPath, &copyError)) {
+    QMessageBox::warning(this, tr("OCR & PDF Export Failed"), copyError);
     return;
   }
 

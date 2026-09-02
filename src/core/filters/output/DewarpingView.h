@@ -7,17 +7,22 @@
 #include <QPointF>
 #include <QPolygonF>
 #include <QRectF>
+#include <QImage>
+#include <QTimer>
 #include <QTransform>
+#include <array>
 #include <vector>
 
 #include "DepthPerception.h"
 #include "DewarpingOptions.h"
 #include "DistortionModel.h"
 #include "DragHandler.h"
+#include "DraggablePoint.h"
 #include "ImagePixmapUnion.h"
 #include "ImageViewBase.h"
 #include "InteractionHandler.h"
 #include "InteractiveXSpline.h"
+#include "ObjectDragHandler.h"
 #include "PageId.h"
 #include "Settings.h"
 #include "ZoomHandler.h"
@@ -48,6 +53,12 @@ class DewarpingView : public ImageViewBase, protected InteractionHandler {
 
   void depthPerceptionChanged(double val);
 
+  void livePreviewChanged(bool enabled);
+
+  void simpleManualModeChanged(bool enabled);
+
+  void resetToNormalGrid();
+
  protected:
   void onPaint(QPainter& painter, const InteractionState& interaction) override;
 
@@ -61,9 +72,47 @@ class DewarpingView : public ImageViewBase, protected InteractionHandler {
 
   void paintXSpline(QPainter& painter, const InteractionState& interaction, const InteractiveXSpline& ispline);
 
+  void paintSimpleControls(QPainter& painter, const InteractionState& interaction);
+
   void curveModified(int curveIdx);
 
   void dragFinished();
+
+  void scheduleLivePreview(int delayMs = 120);
+
+  void rebuildLivePreview();
+
+  void paintInPlacePreview(QPainter& painter) const;
+
+  QPointF simpleAnchorPosition(int curveIdx, int anchorIdx) const;
+
+  QPointF simpleHandlePosition(int curveIdx, int anchorIdx) const;
+
+  QPointF simpleBorderPosition(int borderIdx, int curveIdx) const;
+
+  QPointF simpleBorderHandlePosition(int borderIdx, int curveIdx) const;
+
+  void simpleHandleMoveRequest(int curveIdx,
+                               int anchorIdx,
+                               const QPointF& widgetPos,
+                               Qt::KeyboardModifiers modifiers);
+
+  void simpleHandleDragFinished(int curveIdx, int anchorIdx);
+
+  void simpleBorderMoveRequest(int borderIdx,
+                               int curveIdx,
+                               const QPointF& widgetPos,
+                               Qt::KeyboardModifiers modifiers);
+
+  void simpleBorderDragFinished();
+
+  void moveSimpleAnchor(int curveIdx, int anchorIdx, const QPointF& sourcePos);
+
+  void moveSimpleBorderPoint(int borderIdx, int curveIdx, const QPointF& sourcePos);
+
+  QPointF snapToNearbyTextLine(const QPointF& sourcePos) const;
+
+  void setSimpleHandlersLinked(bool linked);
 
   QPointF sourceToWidget(const QPointF& pt) const;
 
@@ -73,6 +122,7 @@ class DewarpingView : public ImageViewBase, protected InteractionHandler {
 
   PageId m_pageId;
   QPolygonF m_virtDisplayArea;
+  QPolygonF m_sourceContentRect;
   DewarpingOptions m_dewarpingOptions;
   dewarping::DistortionModel m_distortionModel;
   DepthPerception m_depthPerception;
@@ -81,6 +131,19 @@ class DewarpingView : public ImageViewBase, protected InteractionHandler {
   DragHandler m_dragHandler;
   ZoomHandler m_zoomHandler;
   QShortcut* m_removeControlPointShortcut;
+  QImage m_previewSourceImage;
+  QImage m_livePreviewImage;
+  QTransform m_sourceToPreview;
+  QTimer m_livePreviewTimer;
+  bool m_livePreviewEnabled;
+  bool m_simpleManualEnabled;
+
+  struct SimpleHandle {
+    DraggablePoint point;
+    ObjectDragHandler handler;
+  };
+  std::array<std::array<SimpleHandle, 3>, 2> m_simpleHandles;
+  std::array<std::array<SimpleHandle, 2>, 2> m_simpleBorderHandles;
 };
 }  // namespace output
 #endif  // ifndef SCANTAILOR_OUTPUT_DEWARPINGVIEW_H_

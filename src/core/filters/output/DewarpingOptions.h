@@ -8,7 +8,9 @@
 #include <QtXml/QDomElement>
 
 namespace output {
-enum DewarpingMode { OFF, AUTO, MANUAL, MARGINAL };
+// Keep existing numeric values stable: application defaults store this enum as
+// an integer. New modes therefore belong at the end.
+enum DewarpingMode { OFF, AUTO, AUTO_BOOK, MANUAL, MARGINAL, AUTO_TABLE };
 
 class DewarpingOptions {
  public:

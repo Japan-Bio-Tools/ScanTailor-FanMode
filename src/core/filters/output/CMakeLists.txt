@@ -14,6 +14,7 @@ set(ui_files
 set(sources
     ../ocr/Filter.cpp ../ocr/Filter.h
     ../ocr/InputFileStager.cpp ../ocr/InputFileStager.h
+    ../ocr/ImagePdfWriter.cpp ../ocr/ImagePdfWriter.h
     ../ocr/OptionsWidget.cpp ../ocr/OptionsWidget.h
     ../ocr/RtlPdfFixer.cpp ../ocr/RtlPdfFixer.h
     ../ocr/Settings.cpp ../ocr/Settings.h

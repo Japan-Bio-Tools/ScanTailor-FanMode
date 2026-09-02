@@ -9,7 +9,7 @@
    <item>
     <widget class="QLabel" name="titleLabel">
      <property name="font"><font><bold>true</bold></font></property>
-     <property name="text"><string>SEARCHABLE PDF</string></property>
+     <property name="text"><string>PDF EXPORT</string></property>
     </widget>
    </item>
    <item>
@@ -20,7 +20,7 @@
       <item><widget class="QCheckBox" name="englishCheckBox"><property name="text"><string>English</string></property></widget></item>
       <item>
        <widget class="QLabel" name="languageHelpLabel">
-        <property name="text"><string>Select both for bilingual books. The project reading direction automatically chooses the primary language.</string></property>
+        <property name="text"><string>Select both for bilingual books. Leave both unchecked to create a normal image-only PDF without OCR.</string></property>
         <property name="wordWrap"><bool>true</bool></property>
        </widget>
       </item>
@@ -48,7 +48,7 @@
      <property name="wordWrap"><bool>true</bool></property>
     </widget>
    </item>
-   <item><widget class="QPushButton" name="exportPdfButton"><property name="text"><string>Export Searchable PDF...</string></property></widget></item>
+   <item><widget class="QPushButton" name="exportPdfButton"><property name="text"><string>Export PDF...</string></property></widget></item>
    <item><widget class="QLabel" name="lastExportLabel"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
    <item>
     <spacer name="verticalSpacer">

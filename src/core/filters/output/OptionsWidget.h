@@ -50,11 +50,21 @@ class OptionsWidget : public FilterOptionsWidget, private Ui::OptionsWidget {
 
   const DepthPerception& depthPerception() const;
 
+  bool liveDewarpingPreviewEnabled() const;
+
+  bool simpleDewarpingModeEnabled() const;
+
  signals:
 
   void despeckleLevelChanged(double level, bool* handled);
 
   void depthPerceptionChanged(double val);
+
+  void liveDewarpingPreviewChanged(bool enabled);
+
+  void simpleDewarpingModeChanged(bool enabled);
+
+  void resetDewarpingRequested();
 
  public slots:
 
@@ -157,6 +167,14 @@ class OptionsWidget : public FilterOptionsWidget, private Ui::OptionsWidget {
   void applyDespeckleConfirmed(const std::set<PageId>& pages);
 
   void changeDewarpingButtonClicked();
+
+  void resetDewarpingButtonClicked();
+
+  void redetectDewarpingButtonClicked();
+
+  void liveDewarpingPreviewToggled(bool enabled);
+
+  void dewarpingEditModeChanged(int index);
 
   void dewarpingChanged(const std::set<PageId>& pages, const DewarpingOptions& opt);
 

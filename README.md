@@ -1,24 +1,61 @@
 # ScanTailor FanMode
 
-ScanTailor FanMode is a local desktop application for scanned-book post-processing. It is based on the maintained
-ScanTailor Advanced engine and will add a focused, simple workflow informed by the ScanFan prototype.
+ScanTailor FanMode is a free, local desktop application for turning scanned books into clean page images and PDF
+files. It is an independent community fork of
+[ScanTailor Advanced](https://github.com/ImageProcessing-ElectronicPublications/scantailor-advanced), with a workflow
+focused on Arabic, English, right-to-left books, covers, accurate content selection, dewarping, and final PDF export.
+It does not upload books or require a web service.
 
-The initial FanMode baseline intentionally preserves ScanTailor Advanced's processing behavior and `.ScanTailor`
-project compatibility. FanMode-specific features will be introduced incrementally on the `fanmode` branch.
+Current release: **0.1.0-alpha.0**. The primary tested platform is Windows x64. Alpha software can change its project
+format, so keep a backup of important source images and `.ScanTailor` projects.
 
-See [FANMODE.md](FANMODE.md) for source provenance, versioning, and the upstream synchronization policy.
+## What FanMode adds
 
-The inherited ScanTailor Advanced engine merges features from `ScanTailor Featured` and `ScanTailor Enhanced`,
-adds new capabilities, and fixes defects.
+- **PDF project input:** convert every page of a PDF to lossless TIFF at a chosen DPI, create a dedicated input
+  folder, and return to New Project with that folder selected.
+- **Arabic and RTL workflow:** choose right-to-left project ordering and produce Arabic or bilingual Arabic/English
+  searchable PDFs with corrected logical text order.
+- **Cover handling:** mark pages as front or back covers, keep them in the correct book position, and independently
+  stretch a marked cover to fill its output page.
+- **Page sizing and layout:** use automatic size, a custom physical size, or the final front-cover size; control all
+  four margins and use automatic, manual, or original-position alignment.
+- **Accurate content detection:** protect isolated titles, headers, and page numbers; include either type explicitly;
+  and re-detect only the current page when needed.
+- **Book and table dewarping:** use separate automatic models for ordinary Arabic/English text and ruled technical or
+  table pages, with simpler manual top/bottom curves, left/right border controls, an advanced grid, reset/re-detect,
+  and correction preview in the main page view.
+- **Final PDF export:** create an Arabic, English, or bilingual searchable PDF, or leave both languages unchecked for
+  an image-only PDF. Compression presets and an estimated size are shown before export.
+- **Self-contained Windows packaging:** bundle the Qt/image runtime libraries, Poppler PDF converter, Tesseract
+  Arabic/English data, and QPDF support required by the application.
+
+## Recommended workflow
+
+1. Create a project from an image folder, or choose **Convert PDF** in the New Project dialog.
+2. Process Fix Orientation, Split Pages, Deskew, Select Content, and Page Layout.
+3. In Select Content, use **Accurate** when a title, header, or page number is missed.
+4. In Output, mark covers and choose a suitable dewarping and image-processing mode.
+5. Run Output for every page, open **OCR & PDF**, choose the languages and compression, then export.
+
+See [FANMODE.md](FANMODE.md) for provenance and compatibility, [BUILDING_WINDOWS.md](BUILDING_WINDOWS.md) for a
+native Windows build, and [CHANGELOG.md](CHANGELOG.md) for the implemented changes. This repository deliberately
+excludes scanned books, PDFs, TIFF conversion folders, personal projects, and test examples.
+
+## Inherited ScanTailor Advanced documentation
+
+The remainder of this README documents the inherited ScanTailor Advanced engine. That engine combines work from
+ScanTailor Featured, ScanTailor Enhanced, ScanTailor Universal, and the original ScanTailor project.
 
 ### Video demonstration of an older version
 [![image](https://github.com/ScanTailor-Advanced/scantailor-advanced/assets/6695517/d0e1dbbe-0e97-4d72-a011-28b171cad939)](https://vimeo.com/12524529) 
 If the video doesn't play, you may to have to login into your vimeo account.
 
 ## Contents:
+* [What FanMode adds](#what-fanmode-adds)
+* [Recommended workflow](#recommended-workflow)
 * [Description](#description)
 * [Building](#building)
-* [About this fork](#about-this-fork)
+* [About the inherited ScanTailor Advanced fork](#about-the-inherited-scantailor-advanced-fork)
 * [Features](#features)
   * [**ScanTailor Enhanced**](#scantailor-enhanced)
     * [Auto margins \[improved\]](#auto-margins-improved)
@@ -68,9 +105,10 @@ It performs operations such as:
   - [selecting content](https://github.com/scantailor/scantailor/wiki/Select-Content) 
   - ... and others. 
   
-You give it raw scans, and you get pages ready to be printed or assembled into a PDF 
-or [DjVu](http://elpa.gnu.org/packages/djvu.html) file. Scanning, optical character recognition, 
-and assembling multi-page documents are out of scope of this project.
+You give it raw scans, and you get pages ready to be printed or assembled into a PDF
+or [DjVu](http://elpa.gnu.org/packages/djvu.html) file. In upstream ScanTailor Advanced, scanning, optical character
+recognition, and assembling multi-page documents are out of scope. FanMode adds PDF-to-TIFF project import and both
+searchable and image-only PDF export while preserving the inherited processing pipeline.
 
 ## Building
 
@@ -99,7 +137,9 @@ Go to [this repository](https://github.com/ScanTailor-Advanced/scantailor-libs-b
 
 **Community examples / test data:** See also [scantailor-testing](https://github.com/ImageProcessing-ElectronicPublications/scantailor-testing) (community repository; issue [#43](https://github.com/ScanTailor-Advanced/scantailor-advanced/issues/43)).
 
-## About this fork
+## About the inherited ScanTailor Advanced fork
+
+This section describes the history of the upstream ScanTailor Advanced repository on which FanMode is based.
 
 Unfortunately, the [repository](https://github.com/4lex4/scantailor-advanced/releases) of @4lex4 seems to be no longer active.
 

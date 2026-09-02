@@ -16,8 +16,13 @@ Dependencies::Dependencies(const QPolygonF& rotatedPageOutline) : m_rotatedPageO
 Dependencies::Dependencies(const QPolygonF& rotatedPageOutline,
                            const AutoManualMode contentDetectionMode,
                            const AutoManualMode pageDetectionMode,
-                           const bool fineTuneCorners)
-    : m_rotatedPageOutline(rotatedPageOutline), m_params(contentDetectionMode, pageDetectionMode, fineTuneCorners) {}
+                           const bool fineTuneCorners,
+                           const bool accurateContentDetection,
+                           const bool includeHeaderTitle,
+                           const bool includePageNumber)
+    : m_rotatedPageOutline(rotatedPageOutline),
+      m_params(contentDetectionMode, pageDetectionMode, fineTuneCorners, accurateContentDetection,
+               includeHeaderTitle, includePageNumber) {}
 
 Dependencies::Dependencies(const QDomElement& depsEl)
     : m_rotatedPageOutline(XmlUnmarshaller::polygonF(depsEl.namedItem("rotated-page-outline").toElement())),
@@ -77,30 +82,54 @@ void Dependencies::setPageDetectionMode(AutoManualMode pageDetectionMode) {
 /* ================================= Dependencies::Params ================================= */
 
 Dependencies::Params::Params()
-    : m_contentDetectionMode(MODE_AUTO), m_pageDetectionMode(MODE_DISABLED), m_fineTuneCorners(false) {}
+    : m_contentDetectionMode(MODE_AUTO),
+      m_pageDetectionMode(MODE_DISABLED),
+      m_fineTuneCorners(false),
+      m_accurateContentDetection(false),
+      m_includeHeaderTitle(true),
+      m_includePageNumber(true) {}
 
 Dependencies::Params::Params(const AutoManualMode contentDetectionMode,
                              const AutoManualMode pageDetectionMode,
-                             const bool fineTuneCorners)
+                             const bool fineTuneCorners,
+                             const bool accurateContentDetection,
+                             const bool includeHeaderTitle,
+                             const bool includePageNumber)
     : m_contentDetectionMode(contentDetectionMode),
       m_pageDetectionMode(pageDetectionMode),
-      m_fineTuneCorners(fineTuneCorners) {}
+      m_fineTuneCorners(fineTuneCorners),
+      m_accurateContentDetection(accurateContentDetection),
+      m_includeHeaderTitle(includeHeaderTitle),
+      m_includePageNumber(includePageNumber) {}
 
 Dependencies::Params::Params(const QDomElement& el)
     : m_contentDetectionMode(stringToAutoManualMode(el.attribute("contentDetectionMode"))),
       m_pageDetectionMode(stringToAutoManualMode(el.attribute("pageDetectionMode"))),
-      m_fineTuneCorners(el.attribute("fineTuneCorners") == "1") {}
+      m_fineTuneCorners(el.attribute("fineTuneCorners") == "1"),
+      m_accurateContentDetection(el.attribute("accurateContentDetection", "0") == "1"),
+      m_includeHeaderTitle(el.attribute("includeHeaderTitle", "1") == "1"),
+      m_includePageNumber(el.attribute("includePageNumber", "1") == "1") {}
 
 QDomElement Dependencies::Params::toXml(QDomDocument& doc, const QString& name) const {
   QDomElement el(doc.createElement(name));
   el.setAttribute("contentDetectionMode", autoManualModeToString(m_contentDetectionMode));
   el.setAttribute("pageDetectionMode", autoManualModeToString(m_pageDetectionMode));
   el.setAttribute("fineTuneCorners", m_fineTuneCorners ? "1" : "0");
+  el.setAttribute("accurateContentDetection", m_accurateContentDetection ? "1" : "0");
+  el.setAttribute("includeHeaderTitle", m_includeHeaderTitle ? "1" : "0");
+  el.setAttribute("includePageNumber", m_includePageNumber ? "1" : "0");
   return el;
 }
 
 bool Dependencies::Params::compatibleWith(const Dependencies::Params& other) const {
   if ((m_contentDetectionMode != MODE_MANUAL) && (m_contentDetectionMode != other.m_contentDetectionMode)) {
+    return false;
+  }
+  if ((m_contentDetectionMode == MODE_AUTO)
+      && ((m_accurateContentDetection != other.m_accurateContentDetection)
+          || (m_accurateContentDetection
+              && ((m_includeHeaderTitle != other.m_includeHeaderTitle)
+                  || (m_includePageNumber != other.m_includePageNumber))))) {
     return false;
   }
   if ((m_pageDetectionMode != MODE_MANUAL) && (m_pageDetectionMode != other.m_pageDetectionMode)) {
@@ -113,7 +142,14 @@ bool Dependencies::Params::compatibleWith(const Dependencies::Params& other) con
 }
 
 bool Dependencies::Params::needUpdateContentBox(const Dependencies::Params& other) const {
-  return (m_contentDetectionMode != MODE_MANUAL) && (m_contentDetectionMode != other.m_contentDetectionMode);
+  if ((m_contentDetectionMode != MODE_MANUAL) && (m_contentDetectionMode != other.m_contentDetectionMode)) {
+    return true;
+  }
+  return (m_contentDetectionMode == MODE_AUTO)
+         && ((m_accurateContentDetection != other.m_accurateContentDetection)
+             || (m_accurateContentDetection
+                 && ((m_includeHeaderTitle != other.m_includeHeaderTitle)
+                     || (m_includePageNumber != other.m_includePageNumber))));
 }
 
 bool Dependencies::Params::needUpdatePageBox(const Dependencies::Params& other) const {

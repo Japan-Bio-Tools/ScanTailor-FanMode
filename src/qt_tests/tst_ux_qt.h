@@ -14,6 +14,9 @@ class TestUxQt : public QObject {
   void testLineEditAcceptsInput();
   void testCollapsibleGroupBoxStateAndSignal();
   void testErrorWidgetCreation();
+  void testDewarpingControlsAndSignals();
+  void testTableDewarpingModeIsAvailable();
+  void testPdfExportAllowsNoOcrLanguages();
 };
 
 #endif

@@ -123,6 +123,21 @@ test_results/
 coverage/
 lcov.info
 
+# Local scanned-book projects and QA material (never publish)
+*.pdf
+*.ScanTailor
+*.scantailor
+*_tiff/
+.codex-inspection-*/
+TESTIMG/
+Testpages/
+tmp/
+/*.tif
+/*.tiff
+/*.jpg
+/*.jpeg
+/*.png
+
 # Packaging / distribution artifacts
 artifacts/
 *.tar

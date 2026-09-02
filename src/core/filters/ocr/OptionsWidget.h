@@ -56,7 +56,7 @@ class OptionsWidget : public FilterOptionsWidget, private Ui::OcrOptionsWidget {
 
   QString selectedLanguages() const;
 
-  QString suggestedPdfPath() const;
+  QString suggestedPdfPath(bool searchable) const;
 
   static QString formatBytes(qint64 bytes);
 

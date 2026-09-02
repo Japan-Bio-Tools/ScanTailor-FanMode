@@ -34,12 +34,19 @@ class DistortionModelBuilder;
 
 class TextLineTracer {
  public:
-  static void trace(const imageproc::GrayImage& input,
-                    const Dpi& dpi,
-                    const QRect& contentRect,
-                    DistortionModelBuilder& output,
-                    const TaskStatus& status,
-                    DebugImages* dbg = nullptr);
+  struct TraceResult {
+    int candidateLineCount = 0;
+    int acceptedLineCount = 0;
+
+    bool isReliableForBookPage() const { return acceptedLineCount >= 4; }
+  };
+
+  static TraceResult trace(const imageproc::GrayImage& input,
+                           const Dpi& dpi,
+                           const QRect& contentRect,
+                           DistortionModelBuilder& output,
+                           const TaskStatus& status,
+                           DebugImages* dbg = nullptr);
 
  private:
   static imageproc::GrayImage downscale(const imageproc::GrayImage& input, const Dpi& dpi);
@@ -48,6 +55,7 @@ class TextLineTracer {
 
   static void extractTextLines(std::list<std::vector<QPointF>>& out,
                                const imageproc::GrayImage& image,
+                               const Dpi& dpi,
                                const std::pair<QLineF, QLineF>& bounds,
                                DebugImages* dbg);
 

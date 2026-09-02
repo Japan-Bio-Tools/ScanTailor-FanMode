@@ -29,7 +29,9 @@ void CacheDrivenTask::process(const PageInfo& pageInfo,
                               const ImageTransformation& xform) {
   std::unique_ptr<Params> params(m_settings->getPageParams(pageInfo.id()));
   const Dependencies deps = (params) ? Dependencies(xform.resultingPreCropArea(), params->contentDetectionMode(),
-                                                    params->pageDetectionMode(), params->isFineTuningEnabled())
+                                                    params->pageDetectionMode(), params->isFineTuningEnabled(),
+                                                    params->isAccurateContentDetectionEnabled(),
+                                                    params->isHeaderTitleIncluded(), params->isPageNumberIncluded())
                                      : Dependencies(xform.resultingPreCropArea());
 
   if (!params || !deps.compatibleWith(params->dependencies())) {

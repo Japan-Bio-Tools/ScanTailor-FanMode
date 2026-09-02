@@ -351,6 +351,8 @@ FilterResultPtr Task::process(const TaskStatus& status, const FilterData& data, 
       params = m_settings->getParams(m_pageId);
 
       if (((params.dewarpingOptions().dewarpingMode() == AUTO)
+           || (params.dewarpingOptions().dewarpingMode() == AUTO_BOOK)
+           || (params.dewarpingOptions().dewarpingMode() == AUTO_TABLE)
            || (params.dewarpingOptions().dewarpingMode() == MARGINAL))
           && distortionModel.isValid()) {
         // A new distortion model was generated.
@@ -568,8 +570,15 @@ void Task::UiUpdater::updateUI(FilterUiInterface* ui) {
   const QPixmap downscaledOrigPixmap(dewarpingView->downscaledPixmap());
   QObject::connect(optWidget, SIGNAL(depthPerceptionChanged(double)), dewarpingView.get(),
                    SLOT(depthPerceptionChanged(double)));
+  QObject::connect(optWidget, SIGNAL(liveDewarpingPreviewChanged(bool)), dewarpingView.get(),
+                   SLOT(livePreviewChanged(bool)));
+  QObject::connect(optWidget, SIGNAL(simpleDewarpingModeChanged(bool)), dewarpingView.get(),
+                   SLOT(simpleManualModeChanged(bool)));
+  QObject::connect(optWidget, SIGNAL(resetDewarpingRequested()), dewarpingView.get(), SLOT(resetToNormalGrid()));
   QObject::connect(dewarpingView.get(), SIGNAL(distortionModelChanged(const dewarping::DistortionModel&)), optWidget,
                    SLOT(distortionModelChanged(const dewarping::DistortionModel&)));
+  dewarpingView->livePreviewChanged(optWidget->liveDewarpingPreviewEnabled() && (optWidget->lastTab() == TAB_DEWARPING));
+  dewarpingView->simpleManualModeChanged(optWidget->simpleDewarpingModeEnabled());
   tabImageRectMap->insert(
       std::pair<ImageViewTab, QRectF>(TAB_DEWARPING, m_xform.resultingPreCropArea().boundingRect()));
 

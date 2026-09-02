@@ -3,6 +3,7 @@
 
 #include "OptionsWidget.h"
 
+#include <DistortionModel.h>
 #include <QToolTip>
 #include <QSignalBlocker>
 #include <utility>
@@ -54,6 +55,9 @@ OptionsWidget::OptionsWidget(std::shared_ptr<Settings> settings, const PageSelec
   fillingColorBox->addItem(tr("Background"), FILL_BACKGROUND);
   fillingColorBox->addItem(tr("White"), FILL_WHITE);
   fillingColorBox->addItem(tr("Black"), FILL_BLACK);
+
+  dewarpingEditModeCombo->addItem(tr("Simple - follow two text lines"), true);
+  dewarpingEditModeCombo->addItem(tr("Advanced grid"), false);
 
   QPointer<OptionsWidgetBinarization> otsuOptionsWidgetBinarization = new OptionsWidgetBinarizationOtsu(m_settings);
   QPointer<OptionsWidgetBinarization> sauvolaOptionsWidgetBinarization
@@ -130,6 +134,8 @@ void OptionsWidget::tabChanged(const ImageViewTab tab) {
   updateDpiDisplay();
   updateColorsDisplay();
   updateDewarpingDisplay();
+  emit liveDewarpingPreviewChanged(liveDewarpingPreviewCB->isChecked() && (tab == TAB_DEWARPING));
+  emit simpleDewarpingModeChanged(simpleDewarpingModeEnabled());
   reloadIfNecessary();
 }
 
@@ -331,7 +337,9 @@ void OptionsWidget::applyColorsButtonClicked() {
 void OptionsWidget::dpiChanged(const std::set<PageId>& pages, const Dpi& dpi) {
   for (const PageId& pageId : pages) {
     Params params(m_settings->getParams(pageId));
-    if (params.dewarpingOptions().dewarpingMode() == AUTO) {
+    if ((params.dewarpingOptions().dewarpingMode() == AUTO)
+        || (params.dewarpingOptions().dewarpingMode() == AUTO_BOOK)
+        || (params.dewarpingOptions().dewarpingMode() == AUTO_TABLE)) {
       DewarpingOptions opt(params.dewarpingOptions());
       opt.setDewarpingMode(MANUAL);
       m_settings->setDewarpingOptions(pageId, opt);
@@ -490,6 +498,38 @@ void OptionsWidget::changeDewarpingButtonClicked() {
   dialog->show();
 }
 
+void OptionsWidget::resetDewarpingButtonClicked() {
+  m_dewarpingOptions.setDewarpingMode(MANUAL);
+  m_dewarpingOptions.setPostDeskewAngle(0.0);
+  m_settings->setDewarpingOptions(m_pageId, m_dewarpingOptions);
+  updateDewarpingDisplay();
+  emit resetDewarpingRequested();
+}
+
+void OptionsWidget::redetectDewarpingButtonClicked() {
+  // Re-detection is intentionally page-specific. Invalidating both the model
+  // and the rendered output prevents a previously cached neutral Auto Book
+  // result from being reused.
+  if ((m_dewarpingOptions.dewarpingMode() != AUTO) && (m_dewarpingOptions.dewarpingMode() != AUTO_BOOK)
+      && (m_dewarpingOptions.dewarpingMode() != AUTO_TABLE)) {
+    m_dewarpingOptions.setDewarpingMode(AUTO_BOOK);
+  }
+  m_settings->setDewarpingOptions(m_pageId, m_dewarpingOptions);
+  m_settings->setDistortionModel(m_pageId, dewarping::DistortionModel());
+  m_settings->removeOutputParams(m_pageId);
+  updateDewarpingDisplay();
+  emit invalidateThumbnail(m_pageId);
+  emit reloadRequested();
+}
+
+void OptionsWidget::liveDewarpingPreviewToggled(const bool enabled) {
+  emit liveDewarpingPreviewChanged(enabled && (m_lastTab == TAB_DEWARPING));
+}
+
+void OptionsWidget::dewarpingEditModeChanged(const int index) {
+  emit simpleDewarpingModeChanged(dewarpingEditModeCombo->itemData(index).toBool());
+}
+
 void OptionsWidget::dewarpingChanged(const std::set<PageId>& pages, const DewarpingOptions& opt) {
   for (const PageId& pageId : pages) {
     m_settings->setDewarpingOptions(pageId, opt);
@@ -514,7 +554,9 @@ void OptionsWidget::dewarpingChanged(const std::set<PageId>& pages, const Dewarp
       // we reload not just on TAB_FILL_ZONES but on all tabs except TAB_DEWARPING.
       // PS: the static original <-> dewarped mappings are constructed
       // in Task::UiUpdater::updateUI().  Look for "new DewarpingPointMapper" there.
-      if ((opt.dewarpingMode() == AUTO) || (m_lastTab != TAB_DEWARPING) || (opt.dewarpingMode() == MARGINAL)) {
+      if ((opt.dewarpingMode() == AUTO) || (opt.dewarpingMode() == AUTO_BOOK)
+          || (opt.dewarpingMode() == AUTO_TABLE) || (m_lastTab != TAB_DEWARPING)
+          || (opt.dewarpingMode() == MARGINAL)) {
         // Switch to the Output tab after reloading.
         m_lastTab = TAB_OUTPUT;
         // These depend on the value of m_lastTab.
@@ -614,6 +656,10 @@ void OptionsWidget::reloadIfNecessary() {
     emit reloadRequested();
     return;
   } else if ((savedDewarpingOptions.dewarpingMode() == AUTO) && (params.dewarpingOptions().dewarpingMode() == AUTO)) {
+  } else if ((savedDewarpingOptions.dewarpingMode() == AUTO_BOOK)
+             && (params.dewarpingOptions().dewarpingMode() == AUTO_BOOK)) {
+  } else if ((savedDewarpingOptions.dewarpingMode() == AUTO_TABLE)
+             && (params.dewarpingOptions().dewarpingMode() == AUTO_TABLE)) {
   } else if ((savedDewarpingOptions.dewarpingMode() == MARGINAL)
              && (params.dewarpingOptions().dewarpingMode() == MARGINAL)) {
   } else if (!savedDistortionModel.matches(params.distortionModel())) {
@@ -768,6 +814,12 @@ void OptionsWidget::updateDewarpingDisplay() {
       break;
     case AUTO:
       dewarpingStatusLabel->setText(tr("Auto"));
+      break;
+    case AUTO_BOOK:
+      dewarpingStatusLabel->setText(tr("Book text auto"));
+      break;
+    case AUTO_TABLE:
+      dewarpingStatusLabel->setText(tr("Tables / technical auto"));
       break;
     case MANUAL:
       dewarpingStatusLabel->setText(tr("Manual"));
@@ -1044,6 +1096,10 @@ void OptionsWidget::setupUiConnections() {
   CONNECT(applySplittingButton, SIGNAL(clicked()), this, SLOT(applySplittingButtonClicked()));
 
   CONNECT(changeDewarpingButton, SIGNAL(clicked()), this, SLOT(changeDewarpingButtonClicked()));
+  CONNECT(resetDewarpingButton, SIGNAL(clicked()), this, SLOT(resetDewarpingButtonClicked()));
+  CONNECT(redetectDewarpingButton, SIGNAL(clicked()), this, SLOT(redetectDewarpingButtonClicked()));
+  CONNECT(liveDewarpingPreviewCB, SIGNAL(toggled(bool)), this, SLOT(liveDewarpingPreviewToggled(bool)));
+  CONNECT(dewarpingEditModeCombo, SIGNAL(currentIndexChanged(int)), this, SLOT(dewarpingEditModeChanged(int)));
 
   CONNECT(applyDepthPerceptionButton, SIGNAL(clicked()), this, SLOT(applyDepthPerceptionButtonClicked()));
 
@@ -1066,6 +1122,14 @@ ImageViewTab OptionsWidget::lastTab() const {
 
 const DepthPerception& OptionsWidget::depthPerception() const {
   return m_depthPerception;
+}
+
+bool OptionsWidget::liveDewarpingPreviewEnabled() const {
+  return liveDewarpingPreviewCB->isChecked();
+}
+
+bool OptionsWidget::simpleDewarpingModeEnabled() const {
+  return dewarpingEditModeCombo->currentData().toBool();
 }
 
 void OptionsWidget::blackOnWhiteToggled(bool value) {

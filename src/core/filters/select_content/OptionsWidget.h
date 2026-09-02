@@ -58,6 +58,18 @@ class OptionsWidget : public FilterOptionsWidget, public UnitsListener, private 
 
     void setFineTuneCornersEnabled(bool fineTune);
 
+    void setAccurateContentDetectionEnabled(bool enabled);
+
+    bool isAccurateContentDetectionEnabled() const;
+
+    void setHeaderTitleIncluded(bool included);
+
+    bool isHeaderTitleIncluded() const;
+
+    void setPageNumberIncluded(bool included);
+
+    bool isPageNumberIncluded() const;
+
     AutoManualMode contentDetectionMode() const;
 
     AutoManualMode pageDetectionMode() const;
@@ -70,6 +82,9 @@ class OptionsWidget : public FilterOptionsWidget, public UnitsListener, private 
     AutoManualMode m_contentDetectionMode;
     AutoManualMode m_pageDetectionMode;
     bool m_fineTuneCornersEnabled;
+    bool m_accurateContentDetectionEnabled;
+    bool m_headerTitleIncluded;
+    bool m_pageNumberIncluded;
   };
 
 
@@ -105,6 +120,12 @@ class OptionsWidget : public FilterOptionsWidget, public UnitsListener, private 
 
   void contentDetectToggled(AutoManualMode mode);
 
+  void accurateContentDetectToggled();
+
+  void accurateOptionsChanged();
+
+  void redetectContent();
+
   void pageDetectToggled(AutoManualMode mode);
 
   void fineTuningChanged(bool checked);
@@ -112,7 +133,9 @@ class OptionsWidget : public FilterOptionsWidget, public UnitsListener, private 
   void dimensionsChangedLocally(double);
 
  private:
-  void updateContentModeIndication(AutoManualMode mode);
+  void updateContentModeIndication(AutoManualMode mode, bool accurate);
+
+  void updateAccurateOptionsDisplay();
 
   void updatePageModeIndication(AutoManualMode mode);
 
@@ -187,6 +210,30 @@ inline void OptionsWidget::UiData::setFineTuneCornersEnabled(bool fineTune) {
 
 inline bool OptionsWidget::UiData::isFineTuningCornersEnabled() const {
   return m_fineTuneCornersEnabled;
+}
+
+inline void OptionsWidget::UiData::setAccurateContentDetectionEnabled(bool enabled) {
+  m_accurateContentDetectionEnabled = enabled;
+}
+
+inline bool OptionsWidget::UiData::isAccurateContentDetectionEnabled() const {
+  return m_accurateContentDetectionEnabled;
+}
+
+inline void OptionsWidget::UiData::setHeaderTitleIncluded(bool included) {
+  m_headerTitleIncluded = included;
+}
+
+inline bool OptionsWidget::UiData::isHeaderTitleIncluded() const {
+  return m_headerTitleIncluded;
+}
+
+inline void OptionsWidget::UiData::setPageNumberIncluded(bool included) {
+  m_pageNumberIncluded = included;
+}
+
+inline bool OptionsWidget::UiData::isPageNumberIncluded() const {
+  return m_pageNumberIncluded;
 }
 }  // namespace select_content
 #endif  // ifndef SCANTAILOR_SELECT_CONTENT_OPTIONSWIDGET_H_

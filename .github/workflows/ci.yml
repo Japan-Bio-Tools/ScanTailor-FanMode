@@ -1,11 +1,11 @@
-# CI: build on push and PR to main/master
+# CI: build and run the complete unit-test suite.
 name: CI
 
 on:
   push:
-    branches: [master, main]
+    branches: [master, main, fanmode]
   pull_request:
-    branches: [master, main]
+    branches: [master, main, fanmode]
 
 jobs:
   build-linux:
@@ -21,7 +21,8 @@ jobs:
             build-essential cmake \
             qt5-qmake qtbase5-dev libqt5svg5-dev qttools5-dev \
             libboost-test-dev libboost-dev \
-            libjpeg-dev libpng-dev libtiff-dev zlib1g-dev
+            libjpeg-dev libpng-dev libtiff-dev zlib1g-dev \
+            libqpdf-dev poppler-utils tesseract-ocr tesseract-ocr-ara
 
       - name: Configure and build
         run: |
@@ -32,4 +33,4 @@ jobs:
       - name: Run tests
         run: |
           cd build
-          ctest -C Release --output-on-failure || true
+          ctest -C Release --output-on-failure

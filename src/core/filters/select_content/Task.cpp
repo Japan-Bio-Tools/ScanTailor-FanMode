@@ -74,7 +74,9 @@ FilterResultPtr Task::process(const TaskStatus& status, const FilterData& data) 
 
   std::unique_ptr<Params> params(m_settings->getPageParams(m_pageId));
   const Dependencies deps = (params) ? Dependencies(data.xform().resultingPreCropArea(), params->contentDetectionMode(),
-                                                    params->pageDetectionMode(), params->isFineTuningEnabled())
+                                                    params->pageDetectionMode(), params->isFineTuningEnabled(),
+                                                    params->isAccurateContentDetectionEnabled(),
+                                                    params->isHeaderTitleIncluded(), params->isPageNumberIncluded())
                                      : Dependencies(data.xform().resultingPreCropArea());
 
   Params newParams(deps);
@@ -128,7 +130,10 @@ FilterResultPtr Task::process(const TaskStatus& status, const FilterData& data) 
 
     if (needUpdateContentBox) {
       if (newParams.contentDetectionMode() == MODE_AUTO) {
-        contentRect = ContentBoxFinder::findContentBox(status, data, pageRect, m_dbg.get());
+        const ContentDetectionOptions detectionOptions{newParams.isAccurateContentDetectionEnabled(),
+                                                       newParams.isHeaderTitleIncluded(),
+                                                       newParams.isPageNumberIncluded()};
+        contentRect = ContentBoxFinder::findContentBox(status, data, pageRect, detectionOptions, m_dbg.get());
       } else if (newParams.contentDetectionMode() == MODE_DISABLED) {
         contentRect = pageRect;
       } else if (newParams.contentDetectionMode() == MODE_MANUAL) {
@@ -159,6 +164,9 @@ FilterResultPtr Task::process(const TaskStatus& status, const FilterData& data) 
   uiData.setContentDetectionMode(newParams.contentDetectionMode());
   uiData.setPageDetectionMode(newParams.pageDetectionMode());
   uiData.setFineTuneCornersEnabled(newParams.isFineTuningEnabled());
+  uiData.setAccurateContentDetectionEnabled(newParams.isAccurateContentDetectionEnabled());
+  uiData.setHeaderTitleIncluded(newParams.isHeaderTitleIncluded());
+  uiData.setPageNumberIncluded(newParams.isPageNumberIncluded());
 
   m_settings->setPageParams(m_pageId, newParams);
 
