@@ -124,7 +124,8 @@ bool ImagePdfWriter::write(const QStringList& imageFiles,
 
       EncodedImage encoded;
       if (!encodeImage(image, jpegQuality, &encoded)) {
-        return fail(ImagePdfWriter::tr("Unable to compress page image:\n%1").arg(QFileInfo(imagePath).absoluteFilePath()));
+        return fail(
+            ImagePdfWriter::tr("Unable to compress page image:\n%1").arg(QFileInfo(imagePath).absoluteFilePath()));
       }
 
       const double pageWidth = image.width() * 72.0 / imageDpi(image.dotsPerMeterX());
@@ -137,16 +138,14 @@ bool ImagePdfWriter::write(const QStringList& imageFiles,
       imageDictionary.replaceKey("/Subtype", QPDFObjectHandle::newName("/Image"));
       imageDictionary.replaceKey("/Width", QPDFObjectHandle::newInteger(image.width()));
       imageDictionary.replaceKey("/Height", QPDFObjectHandle::newInteger(image.height()));
-      imageDictionary.replaceKey("/ColorSpace",
-                                 QPDFObjectHandle::newName(encoded.colorSpace.constData()));
-      imageDictionary.replaceKey("/BitsPerComponent",
-                                 QPDFObjectHandle::newInteger(encoded.bitsPerComponent));
+      imageDictionary.replaceKey("/ColorSpace", QPDFObjectHandle::newName(encoded.colorSpace.constData()));
+      imageDictionary.replaceKey("/BitsPerComponent", QPDFObjectHandle::newInteger(encoded.bitsPerComponent));
       imageDictionary.replaceKey("/Filter", QPDFObjectHandle::newName(encoded.filter.constData()));
 
       std::ostringstream content;
       content.imbue(std::locale::classic());
-      content << std::fixed << std::setprecision(4) << "q\n" << pageWidth << " 0 0 " << pageHeight
-              << " 0 0 cm\n/Im0 Do\nQ\n";
+      content << std::fixed << std::setprecision(4) << "q\n"
+              << pageWidth << " 0 0 " << pageHeight << " 0 0 cm\n/Im0 Do\nQ\n";
       QPDFObjectHandle contents(pdf.newStream(content.str()));
 
       QPDFObjectHandle xObjects(QPDFObjectHandle::newDictionary());
@@ -169,8 +168,8 @@ bool ImagePdfWriter::write(const QStringList& imageFiles,
     writer.setObjectStreamMode(qpdf_o_generate);
     writer.write();
   } catch (const std::exception& error) {
-    return fail(ImagePdfWriter::tr("Unable to create the image-only PDF:\n%1")
-                    .arg(QString::fromLocal8Bit(error.what())));
+    return fail(
+        ImagePdfWriter::tr("Unable to create the image-only PDF:\n%1").arg(QString::fromLocal8Bit(error.what())));
   }
   return true;
 }

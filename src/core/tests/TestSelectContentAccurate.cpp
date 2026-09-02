@@ -30,8 +30,7 @@ BOOST_AUTO_TEST_CASE(accurate_edge_pass_includes_header_and_page_number) {
   }
   drawGlyph(image, 596, 1660, 11, 20);
 
-  const QRect accurateRect
-      = ContentBoxFinder::expandContentBoxForEdgeText(image, pageRect, standardRect, true, true);
+  const QRect accurateRect = ContentBoxFinder::expandContentBoxForEdgeText(image, pageRect, standardRect, true, true);
 
   BOOST_CHECK_LT(accurateRect.top(), standardRect.top());
   BOOST_CHECK_LE(accurateRect.top(), 150);
@@ -45,8 +44,7 @@ BOOST_AUTO_TEST_CASE(accurate_edge_pass_respects_disabled_protection) {
   const QRect standardRect(180, 400, 840, 1100);
   drawGlyph(image, 596, 1660, 11, 20);
 
-  const QRect unchanged
-      = ContentBoxFinder::expandContentBoxForEdgeText(image, pageRect, standardRect, false, false);
+  const QRect unchanged = ContentBoxFinder::expandContentBoxForEdgeText(image, pageRect, standardRect, false, false);
   BOOST_CHECK(unchanged == standardRect);
 }
 
@@ -57,8 +55,7 @@ BOOST_AUTO_TEST_CASE(accurate_edge_pass_rejects_dust_and_rules) {
   image.fill(QRect(500, 120, 2, 2), BLACK);
   image.fill(QRect(350, 1670, 220, 2), BLACK);
 
-  const QRect unchanged
-      = ContentBoxFinder::expandContentBoxForEdgeText(image, pageRect, standardRect, true, true);
+  const QRect unchanged = ContentBoxFinder::expandContentBoxForEdgeText(image, pageRect, standardRect, true, true);
   BOOST_CHECK(unchanged == standardRect);
 }
 

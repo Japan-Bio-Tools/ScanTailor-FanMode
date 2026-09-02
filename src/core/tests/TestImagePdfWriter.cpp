@@ -1,16 +1,16 @@
 // Copyright (C) 2026 ScanTailor FanMode contributors
 // Use of this source code is governed by the GNU GPLv3 license that can be found in the LICENSE file.
 
-#include <filters/ocr/ImagePdfWriter.h>
 #include <core/TiffWriter.h>
+#include <filters/ocr/ImagePdfWriter.h>
 
 #include <qpdf/Buffer.hh>
 #include <qpdf/QPDF.hh>
 #include <qpdf/QPDFPageDocumentHelper.hh>
 #include <qpdf/QPDFPageObjectHelper.hh>
 
-#include <QDir>
 #include <QCoreApplication>
+#include <QDir>
 #include <QFileInfo>
 #include <QImage>
 #include <QTemporaryDir>
@@ -46,12 +46,13 @@ BOOST_AUTO_TEST_CASE(creates_multi_page_pdf_without_a_text_layer) {
   const QString pdfPath = QDir(directory.path()).filePath(QStringLiteral("book.pdf"));
   QString error;
   int lastProgress = -1;
-  const bool written = ocr::ImagePdfWriter::write({firstImage, secondImage}, pdfPath, 82,
-                                                   [&](const int completed, const int) {
-                                                     lastProgress = completed;
-                                                     return true;
-                                                   },
-                                                   &error);
+  const bool written = ocr::ImagePdfWriter::write(
+      {firstImage, secondImage}, pdfPath, 82,
+      [&](const int completed, const int) {
+        lastProgress = completed;
+        return true;
+      },
+      &error);
   BOOST_REQUIRE_MESSAGE(written, error.toStdString());
   BOOST_CHECK_EQUAL(lastProgress, 2);
   BOOST_CHECK(QFileInfo(pdfPath).size() > 0);
@@ -89,8 +90,8 @@ BOOST_AUTO_TEST_CASE(cancel_before_first_page_writes_nothing) {
   BOOST_REQUIRE(image.save(imagePath));
 
   QString error;
-  BOOST_CHECK(!ocr::ImagePdfWriter::write({imagePath}, pdfPath, 82,
-                                          [](const int, const int) { return false; }, &error));
+  BOOST_CHECK(
+      !ocr::ImagePdfWriter::write({imagePath}, pdfPath, 82, [](const int, const int) { return false; }, &error));
   BOOST_CHECK(error.isEmpty());
   BOOST_CHECK(!QFileInfo::exists(pdfPath));
 }

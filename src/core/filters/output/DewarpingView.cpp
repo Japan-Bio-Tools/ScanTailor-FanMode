@@ -10,8 +10,8 @@
 #include <QFontMetrics>
 #include <QPainter>
 #include <QShortcut>
-#include <boost/bind/bind.hpp>
 #include <algorithm>
+#include <boost/bind/bind.hpp>
 #include <cmath>
 #include <exception>
 
@@ -105,10 +105,9 @@ DewarpingView::DewarpingView(const QImage& image,
   for (int curveIdx = 0; curveIdx < 2; ++curveIdx) {
     for (int anchorIdx = 0; anchorIdx < 3; ++anchorIdx) {
       SimpleHandle& handle = m_simpleHandles[curveIdx][anchorIdx];
-      handle.point.setPositionCallback(
-          boost::bind(&DewarpingView::simpleHandlePosition, this, curveIdx, anchorIdx));
+      handle.point.setPositionCallback(boost::bind(&DewarpingView::simpleHandlePosition, this, curveIdx, anchorIdx));
       handle.point.setMoveRequestCallback(boost::bind(&DewarpingView::simpleHandleMoveRequest, this, curveIdx,
-                                                       anchorIdx, boost::placeholders::_1, boost::placeholders::_2));
+                                                      anchorIdx, boost::placeholders::_1, boost::placeholders::_2));
       handle.point.setDragFinishedCallback(
           boost::bind(&DewarpingView::simpleHandleDragFinished, this, curveIdx, anchorIdx));
       handle.point.setHitRadius(13.0);
@@ -127,7 +126,7 @@ DewarpingView::DewarpingView(const QImage& image,
       handle.point.setPositionCallback(
           boost::bind(&DewarpingView::simpleBorderHandlePosition, this, borderIdx, curveIdx));
       handle.point.setMoveRequestCallback(boost::bind(&DewarpingView::simpleBorderMoveRequest, this, borderIdx,
-                                                       curveIdx, boost::placeholders::_1, boost::placeholders::_2));
+                                                      curveIdx, boost::placeholders::_1, boost::placeholders::_2));
       handle.point.setDragFinishedCallback(boost::bind(&DewarpingView::simpleBorderDragFinished, this));
       handle.point.setHitRadius(13.0);
       handle.point.setProximityPriority(11);
@@ -291,10 +290,9 @@ void DewarpingView::rebuildLivePreview() {
 
     const dewarping::CylindricalSurfaceDewarper dewarper(top, bottom, m_depthPerception.value());
     const QRectF previewContentRect = m_sourceToPreview.map(m_sourceContentRect).boundingRect();
-    const QRectF modelDomain
-        = m_distortionModel.modelDomain(dewarper, m_sourceToPreview, previewContentRect);
-    m_livePreviewImage = dewarping::RasterDewarper::dewarp(
-        m_previewSourceImage, m_previewSourceImage.size(), dewarper, modelDomain, Qt::white);
+    const QRectF modelDomain = m_distortionModel.modelDomain(dewarper, m_sourceToPreview, previewContentRect);
+    m_livePreviewImage = dewarping::RasterDewarper::dewarp(m_previewSourceImage, m_previewSourceImage.size(), dewarper,
+                                                           modelDomain, Qt::white);
   } catch (const std::exception& error) {
     qWarning() << "Live dewarping preview failed:" << error.what();
     m_livePreviewImage = QImage();
@@ -448,8 +446,7 @@ void DewarpingView::paintSimpleControls(QPainter& painter, const InteractionStat
       painter.setBrush(highlighted ? curveColors[curveIdx].lighter(125) : curveColors[curveIdx]);
       painter.drawEllipse(center, highlighted ? 11.0 : 9.0, highlighted ? 11.0 : 9.0);
       painter.setPen(Qt::white);
-      painter.drawText(QRectF(center.x() - 9, center.y() - 9, 18, 18), Qt::AlignCenter,
-                       QString::number(anchorIdx + 1));
+      painter.drawText(QRectF(center.x() - 9, center.y() - 9, 18, 18), Qt::AlignCenter, QString::number(anchorIdx + 1));
     }
   }
 
@@ -460,17 +457,16 @@ void DewarpingView::paintSimpleControls(QPainter& painter, const InteractionStat
       const double radius = highlighted ? 11.0 : 9.0;
       painter.setPen(QPen(Qt::white, highlighted ? 3.0 : 2.0));
       painter.setBrush(highlighted ? borderColor.lighter(125) : borderColor);
-      painter.drawRoundedRect(QRectF(center.x() - radius, center.y() - radius, 2.0 * radius, 2.0 * radius),
-                              3.0, 3.0);
+      painter.drawRoundedRect(QRectF(center.x() - radius, center.y() - radius, 2.0 * radius, 2.0 * radius), 3.0, 3.0);
       painter.setPen(Qt::white);
-      painter.drawText(QRectF(center.x() - radius, center.y() - radius, 2.0 * radius, 2.0 * radius),
-                       Qt::AlignCenter, borderIdx == 0 ? tr("L") : tr("R"));
+      painter.drawText(QRectF(center.x() - radius, center.y() - radius, 2.0 * radius, 2.0 * radius), Qt::AlignCenter,
+                       borderIdx == 0 ? tr("L") : tr("R"));
     }
   }
 
-  const QString instruction
-      = tr("Simple manual: place orange 1-2-3 on an upper text line and green 1-2-3 on a lower line. "
-           "Use the four blue L/R points for the left and right page borders.");
+  const QString instruction = tr(
+      "Simple manual: place orange 1-2-3 on an upper text line and green 1-2-3 on a lower line. "
+      "Use the four blue L/R points for the left and right page borders.");
   const QRect availableRect(viewport()->rect().adjusted(12, 12, -12, -12));
   const QRect textRect(painter.fontMetrics().boundingRect(availableRect, Qt::TextWordWrap, instruction));
   const QRect panelRect(textRect.adjusted(-8, -5, 8, 5));
@@ -622,9 +618,7 @@ void DewarpingView::moveSimpleAnchor(const int curveIdx, const int anchorIdx, co
   interactiveSpline.setSpline(spline);
 }
 
-void DewarpingView::moveSimpleBorderPoint(const int borderIdx,
-                                          const int curveIdx,
-                                          const QPointF& sourcePos) {
+void DewarpingView::moveSimpleBorderPoint(const int borderIdx, const int curveIdx, const QPointF& sourcePos) {
   InteractiveXSpline& interactiveSpline = curveIdx == 0 ? m_topSpline : m_bottomSpline;
   XSpline spline(interactiveSpline.spline());
   if (spline.numControlPoints() < 2) {
@@ -720,8 +714,7 @@ void DewarpingView::curveModified(int curveIdx) {
 
 void DewarpingView::dragFinished() {
   if ((m_dewarpingOptions.dewarpingMode() == AUTO) || (m_dewarpingOptions.dewarpingMode() == AUTO_BOOK)
-      || (m_dewarpingOptions.dewarpingMode() == MARGINAL)
-      || (m_dewarpingOptions.dewarpingMode() == AUTO_TABLE)) {
+      || (m_dewarpingOptions.dewarpingMode() == MARGINAL) || (m_dewarpingOptions.dewarpingMode() == AUTO_TABLE)) {
     m_dewarpingOptions.setDewarpingMode(MANUAL);
   }
   emit distortionModelChanged(m_distortionModel);

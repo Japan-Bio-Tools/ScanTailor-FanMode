@@ -11,11 +11,11 @@
 #include <PageSelectionAccessor.h>
 #include <PageSelectionProvider.h>
 #include <PageSequence.h>
-#include <filters/output/OptionsWidget.h>
-#include <filters/output/ChangeDewarpingDialog.h>
-#include <filters/output/Settings.h>
 #include <filters/ocr/OptionsWidget.h>
 #include <filters/ocr/Settings.h>
+#include <filters/output/ChangeDewarpingDialog.h>
+#include <filters/output/OptionsWidget.h>
+#include <filters/output/Settings.h>
 
 #include <QCheckBox>
 #include <QComboBox>

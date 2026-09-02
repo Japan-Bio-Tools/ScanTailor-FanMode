@@ -414,8 +414,7 @@ QRectF ContentBoxFinder::findContentBox(const TaskStatus& status,
     return standardContentRect;
   }
 
-  const QRect pageRect300
-      = virtualToXform300.mapRect(pageRect).toAlignedRect().intersected(bw300.rect());
+  const QRect pageRect300 = virtualToXform300.mapRect(pageRect).toAlignedRect().intersected(bw300.rect());
   if (pageRect300.isEmpty()) {
     return standardContentRect;
   }
@@ -426,9 +425,8 @@ QRectF ContentBoxFinder::findContentBox(const TaskStatus& status,
 
   const QRect standardContentRect300
       = virtualToXform300.mapRect(standardContentRect).toAlignedRect().intersected(pageRect300);
-  const QRect accurateContentRect300
-      = expandContentBoxForEdgeText(bw300, pageRect300, standardContentRect300, options.includeHeaderTitle,
-                                    options.includePageNumber);
+  const QRect accurateContentRect300 = expandContentBoxForEdgeText(
+      bw300, pageRect300, standardContentRect300, options.includeHeaderTitle, options.includePageNumber);
   if (accurateContentRect300 == standardContentRect300) {
     return standardContentRect;
   }
@@ -451,10 +449,10 @@ QRectF ContentBoxFinder::findContentBox(const TaskStatus& status,
 }  // ContentBoxFinder::findContentBox
 
 QRect ContentBoxFinder::expandContentBoxForEdgeText(const imageproc::BinaryImage& content,
-                                                     const QRect& pageRect,
-                                                     const QRect& standardContentRect,
-                                                     const bool includeHeaderTitle,
-                                                     const bool includePageNumber) {
+                                                    const QRect& pageRect,
+                                                    const QRect& standardContentRect,
+                                                    const bool includeHeaderTitle,
+                                                    const bool includePageNumber) {
   const QRect page(pageRect.intersected(content.rect()));
   if (page.isEmpty() || (!includeHeaderTitle && !includePageNumber)) {
     return standardContentRect.intersected(page);
@@ -541,8 +539,7 @@ QRect ContentBoxFinder::expandContentBoxForEdgeText(const imageproc::BinaryImage
       for (int i = 0; i < static_cast<int>(lines.size()); ++i) {
         const TextLine& line = lines[i];
         const int verticalDistance = std::abs(component.rect.center().y() - line.rect.center().y());
-        const int verticalTolerance
-            = std::max(4, 3 * std::max(component.rect.height(), line.tallestComponent) / 4);
+        const int verticalTolerance = std::max(4, 3 * std::max(component.rect.height(), line.tallestComponent) / 4);
         const int gap = horizontalGap(component.rect, line.rect);
         const int horizontalTolerance
             = std::max(page.width() / 7, 8 * std::max(component.rect.height(), line.tallestComponent));
@@ -580,15 +577,12 @@ QRect ContentBoxFinder::expandContentBoxForEdgeText(const imageproc::BinaryImage
 
       bool plausible = false;
       if (pageNumberBand) {
-        plausible = (height <= std::max(12, page.height() / 16)) && (width <= page.width() / 3)
-                    && (line.pixels >= 6)
+        plausible = (height <= std::max(12, page.height() / 16)) && (width <= page.width() / 3) && (line.pixels >= 6)
                     && ((line.significantCount >= 2) || ((line.significantCount == 1) && (height >= 5)));
       } else {
-        plausible = (height <= page.height() / 8) && (width >= std::max(6, page.width() / 100))
-                    && (line.pixels >= 14)
+        plausible = (height <= page.height() / 8) && (width >= std::max(6, page.width() / 100)) && (line.pixels >= 14)
                     && ((line.significantCount >= 2)
-                        || ((line.significantCount == 1) && (width >= page.width() / 80)
-                            && (line.pixels >= 20)));
+                        || ((line.significantCount == 1) && (width >= page.width() / 80) && (line.pixels >= 20)));
       }
 
       if (plausible) {
@@ -599,18 +593,15 @@ QRect ContentBoxFinder::expandContentBoxForEdgeText(const imageproc::BinaryImage
 
   const QRect standard(standardContentRect.intersected(safePage));
   const int bodyTop = standard.isEmpty() ? safePage.top() + safePage.height() * 45 / 100 : standard.top();
-  const int bodyBottom
-      = standard.isEmpty() ? safePage.top() + safePage.height() * 60 / 100 : standard.bottom();
+  const int bodyBottom = standard.isEmpty() ? safePage.top() + safePage.height() * 60 / 100 : standard.bottom();
 
   if (includeHeaderTitle) {
     const int headerBottom = std::min(bodyTop - 1, safePage.top() + safePage.height() * 45 / 100);
-    detectTextLines(QRect(safePage.left(), safePage.top(), safePage.width(), headerBottom - safePage.top() + 1),
-                    false);
+    detectTextLines(QRect(safePage.left(), safePage.top(), safePage.width(), headerBottom - safePage.top() + 1), false);
   }
   if (includePageNumber) {
     const int topBandBottom = std::min(bodyTop - 1, safePage.top() + safePage.height() / 5);
-    detectTextLines(QRect(safePage.left(), safePage.top(), safePage.width(), topBandBottom - safePage.top() + 1),
-                    true);
+    detectTextLines(QRect(safePage.left(), safePage.top(), safePage.width(), topBandBottom - safePage.top() + 1), true);
     const int bottomBandTop = std::max(bodyBottom + 1, safePage.top() + safePage.height() * 3 / 5);
     detectTextLines(QRect(safePage.left(), bottomBandTop, safePage.width(), safePage.bottom() - bottomBandTop + 1),
                     true);

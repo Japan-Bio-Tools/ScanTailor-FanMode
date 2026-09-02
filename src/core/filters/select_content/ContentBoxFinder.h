@@ -37,7 +37,8 @@ class ContentBoxFinder {
 
   /**
    * Expands a standard content rectangle with plausible text lines from the
-   * page's upper and lower edge bands. Coordinates are image pixels.
+   * page's upper and lower edge
+   * bands. Coordinates are image pixels.
    * Exposed for deterministic regression tests of Accurate mode.
    */
   static QRect expandContentBoxForEdgeText(const imageproc::BinaryImage& content,

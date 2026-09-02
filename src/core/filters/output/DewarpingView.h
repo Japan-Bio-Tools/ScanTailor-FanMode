@@ -4,10 +4,10 @@
 #ifndef SCANTAILOR_OUTPUT_DEWARPINGVIEW_H_
 #define SCANTAILOR_OUTPUT_DEWARPINGVIEW_H_
 
+#include <QImage>
 #include <QPointF>
 #include <QPolygonF>
 #include <QRectF>
-#include <QImage>
 #include <QTimer>
 #include <QTransform>
 #include <array>
@@ -92,17 +92,11 @@ class DewarpingView : public ImageViewBase, protected InteractionHandler {
 
   QPointF simpleBorderHandlePosition(int borderIdx, int curveIdx) const;
 
-  void simpleHandleMoveRequest(int curveIdx,
-                               int anchorIdx,
-                               const QPointF& widgetPos,
-                               Qt::KeyboardModifiers modifiers);
+  void simpleHandleMoveRequest(int curveIdx, int anchorIdx, const QPointF& widgetPos, Qt::KeyboardModifiers modifiers);
 
   void simpleHandleDragFinished(int curveIdx, int anchorIdx);
 
-  void simpleBorderMoveRequest(int borderIdx,
-                               int curveIdx,
-                               const QPointF& widgetPos,
-                               Qt::KeyboardModifiers modifiers);
+  void simpleBorderMoveRequest(int borderIdx, int curveIdx, const QPointF& widgetPos, Qt::KeyboardModifiers modifiers);
 
   void simpleBorderDragFinished();
 

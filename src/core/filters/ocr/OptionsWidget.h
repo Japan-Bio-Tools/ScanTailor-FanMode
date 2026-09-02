@@ -4,8 +4,8 @@
 #ifndef SCANTAILOR_OCR_OPTIONSWIDGET_H_
 #define SCANTAILOR_OCR_OPTIONSWIDGET_H_
 
-#include <memory>
 #include <QStringList>
+#include <memory>
 #include <vector>
 
 #include "FilterOptionsWidget.h"

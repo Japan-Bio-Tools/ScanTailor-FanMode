@@ -26,8 +26,8 @@
 #include <SavGolFilter.h>
 #include <Scale.h>
 #include <SeedFill.h>
-#include <TextLineTracer.h>
 #include <TableLineDistortionModelBuilder.h>
+#include <TextLineTracer.h>
 #include <TopBottomEdgeTracer.h>
 #include <Transform.h>
 #include <core/ApplicationSettings.h>
@@ -48,9 +48,9 @@
 #include <QPolygonF>
 #include <QSize>
 #include <QTransform>
+#include <algorithm>
 #include <boost/bind/bind.hpp>
 #include <boost/function.hpp>
-#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
@@ -212,8 +212,7 @@ class OutputGenerator::Processor {
                                            const QTransform& toOriginal,
                                            bool includePageEdges) const;
 
-  DistortionModel buildTableDistortionModel(const GrayImage& warpedGrayOutput,
-                                            const QTransform& toOriginal) const;
+  DistortionModel buildTableDistortionModel(const GrayImage& warpedGrayOutput, const QTransform& toOriginal) const;
 
   DistortionModel buildMarginalDistortionModel() const;
 
@@ -1321,8 +1320,7 @@ std::unique_ptr<OutputImage> OutputGenerator::Processor::processImpl(ZoneSet& pi
       m_colorOriginal ? m_inputOrigImage : m_inputGrayImage, m_outCropAreaInOriginalCs);
 
   if ((m_dewarpingOptions.dewarpingMode() == AUTO) || (m_dewarpingOptions.dewarpingMode() == AUTO_BOOK)
-      || (m_dewarpingOptions.dewarpingMode() == AUTO_TABLE)
-      || (m_dewarpingOptions.dewarpingMode() == MARGINAL)
+      || (m_dewarpingOptions.dewarpingMode() == AUTO_TABLE) || (m_dewarpingOptions.dewarpingMode() == MARGINAL)
       || ((m_dewarpingOptions.dewarpingMode() == MANUAL) && distortionModel.isValid())) {
     return processWithDewarping(pictureZones, fillZones, distortionModel, depthPerception, autoPictureMask,
                                 specklesImage);
@@ -1696,8 +1694,8 @@ std::unique_ptr<OutputImage> OutputGenerator::Processor::processWithDewarping(Zo
   }
 
   if ((m_dewarpingOptions.dewarpingMode() == AUTO) || (m_dewarpingOptions.dewarpingMode() == AUTO_BOOK)) {
-    distortionModel = buildAutoDistortionModel(warpedGrayOutput, workingToOrig,
-                                               m_dewarpingOptions.dewarpingMode() == AUTO);
+    distortionModel
+        = buildAutoDistortionModel(warpedGrayOutput, workingToOrig, m_dewarpingOptions.dewarpingMode() == AUTO);
   } else if (m_dewarpingOptions.dewarpingMode() == MARGINAL) {
     distortionModel = buildMarginalDistortionModel();
   } else if (m_dewarpingOptions.dewarpingMode() == AUTO_TABLE) {
@@ -2810,7 +2808,7 @@ DistortionModel OutputGenerator::Processor::buildAutoDistortionModel(const GrayI
 }
 
 DistortionModel OutputGenerator::Processor::buildTableDistortionModel(const GrayImage& warpedGrayOutput,
-                                                                       const QTransform& toOriginal) const {
+                                                                      const QTransform& toOriginal) const {
   const TableLineDistortionModelBuilder::Result detection
       = TableLineDistortionModelBuilder::build(warpedGrayOutput, m_contentRectInWorkingCs);
   m_status.throwIfCancelled();

@@ -3,8 +3,8 @@
 
 #include <GrayImage.h>
 #include <TableLineDistortionModelBuilder.h>
-#include <boost/test/unit_test.hpp>
 #include <algorithm>
+#include <boost/test/unit_test.hpp>
 #include <cmath>
 
 using dewarping::TableLineDistortionModelBuilder;

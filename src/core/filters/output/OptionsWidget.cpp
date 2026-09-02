@@ -4,8 +4,8 @@
 #include "OptionsWidget.h"
 
 #include <DistortionModel.h>
-#include <QToolTip>
 #include <QSignalBlocker>
+#include <QToolTip>
 #include <utility>
 
 #include "../../Utils.h"
@@ -337,8 +337,7 @@ void OptionsWidget::applyColorsButtonClicked() {
 void OptionsWidget::dpiChanged(const std::set<PageId>& pages, const Dpi& dpi) {
   for (const PageId& pageId : pages) {
     Params params(m_settings->getParams(pageId));
-    if ((params.dewarpingOptions().dewarpingMode() == AUTO)
-        || (params.dewarpingOptions().dewarpingMode() == AUTO_BOOK)
+    if ((params.dewarpingOptions().dewarpingMode() == AUTO) || (params.dewarpingOptions().dewarpingMode() == AUTO_BOOK)
         || (params.dewarpingOptions().dewarpingMode() == AUTO_TABLE)) {
       DewarpingOptions opt(params.dewarpingOptions());
       opt.setDewarpingMode(MANUAL);
@@ -554,9 +553,8 @@ void OptionsWidget::dewarpingChanged(const std::set<PageId>& pages, const Dewarp
       // we reload not just on TAB_FILL_ZONES but on all tabs except TAB_DEWARPING.
       // PS: the static original <-> dewarped mappings are constructed
       // in Task::UiUpdater::updateUI().  Look for "new DewarpingPointMapper" there.
-      if ((opt.dewarpingMode() == AUTO) || (opt.dewarpingMode() == AUTO_BOOK)
-          || (opt.dewarpingMode() == AUTO_TABLE) || (m_lastTab != TAB_DEWARPING)
-          || (opt.dewarpingMode() == MARGINAL)) {
+      if ((opt.dewarpingMode() == AUTO) || (opt.dewarpingMode() == AUTO_BOOK) || (opt.dewarpingMode() == AUTO_TABLE)
+          || (m_lastTab != TAB_DEWARPING) || (opt.dewarpingMode() == MARGINAL)) {
         // Switch to the Output tab after reloading.
         m_lastTab = TAB_OUTPUT;
         // These depend on the value of m_lastTab.

@@ -18,11 +18,11 @@
 #include <Sobel.h>
 
 #include <QPainter>
+#include <algorithm>
 #include <boost/foreach.hpp>
 #include <boost/lambda/bind.hpp>
 #include <boost/lambda/if.hpp>
 #include <boost/lambda/lambda.hpp>
-#include <algorithm>
 #include <cmath>
 
 #include "DebugImages.h"
@@ -341,7 +341,7 @@ void TextLineTracer::extractTextLines(std::list<std::vector<QPointF>>& out,
   }
 
   rasterOpGeneric(mainGrid.data(), mainGrid.stride(), size, auxGrid.data(), auxGrid.stride(),
-                  _2 = bind((float (*)(float)) & std::fabs, _1));
+                  _2 = bind((float (*)(float)) &std::fabs, _1));
   if (dbg) {
     dbg->add(visualizeGradient(image, auxGrid), "abs");
   }
@@ -352,7 +352,7 @@ void TextLineTracer::extractTextLines(std::list<std::vector<QPointF>>& out,
   }
 
   rasterOpGeneric(mainGrid.data(), mainGrid.stride(), size, auxGrid.data(), auxGrid.stride(),
-                  _2 += _1 - bind((float (*)(float)) & std::fabs, _1));
+                  _2 += _1 - bind((float (*)(float)) &std::fabs, _1));
   if (dbg) {
     dbg->add(visualizeGradient(image, auxGrid), "+= diff");
   }

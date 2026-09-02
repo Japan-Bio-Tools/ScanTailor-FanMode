@@ -57,8 +57,9 @@ QImage stretchToFullPage(const QImage& image, const QRect& contentRect, const QS
   }
 
   const bool binary = (image.format() == QImage::Format_Mono) || (image.format() == QImage::Format_MonoLSB);
-  QImage result = image.copy(sourceRect).scaled(outputSize, Qt::IgnoreAspectRatio,
-                                                binary ? Qt::FastTransformation : Qt::SmoothTransformation);
+  QImage result
+      = image.copy(sourceRect)
+            .scaled(outputSize, Qt::IgnoreAspectRatio, binary ? Qt::FastTransformation : Qt::SmoothTransformation);
   result.setDotsPerMeterX(image.dotsPerMeterX());
   result.setDotsPerMeterY(image.dotsPerMeterY());
   return result;
@@ -182,12 +183,11 @@ FilterResultPtr Task::process(const TaskStatus& status, const FilterData& data, 
   const OutputGenerator generator(newXform, contentRectPhys);
   const bool stretchCover = params.isCover() && params.stretchCover();
 
-  OutputImageParams newOutputImageParams(generator.outputImageSize(), generator.outputContentRect(), newXform,
-                                         params.outputDpi(), params.colorParams(), params.splittingOptions(),
-                                         params.dewarpingOptions(), params.distortionModel(), params.depthPerception(),
-                                         params.despeckleLevel(), params.pictureShapeOptions(),
-                                         m_settings->getOutputProcessingParams(m_pageId), params.isBlackOnWhite(),
-                                         stretchCover);
+  OutputImageParams newOutputImageParams(
+      generator.outputImageSize(), generator.outputContentRect(), newXform, params.outputDpi(), params.colorParams(),
+      params.splittingOptions(), params.dewarpingOptions(), params.distortionModel(), params.depthPerception(),
+      params.despeckleLevel(), params.pictureShapeOptions(), m_settings->getOutputProcessingParams(m_pageId),
+      params.isBlackOnWhite(), stretchCover);
 
   ZoneSet newPictureZones(m_settings->pictureZonesForPage(m_pageId));
   const ZoneSet newFillZones(m_settings->fillZonesForPage(m_pageId));
@@ -372,10 +372,10 @@ FilterResultPtr Task::process(const TaskStatus& status, const FilterData& data, 
         QImage foregroundImage = outputImageWithForeground->getForegroundImage();
         QImage backgroundImage = outputImageWithForeground->getBackgroundImage();
         if (stretchCover) {
-          foregroundImage = stretchToFullPage(foregroundImage, generator.outputContentRect(),
-                                              generator.outputImageSize());
-          backgroundImage = stretchToFullPage(backgroundImage, generator.outputContentRect(),
-                                              generator.outputImageSize());
+          foregroundImage
+              = stretchToFullPage(foregroundImage, generator.outputContentRect(), generator.outputImageSize());
+          backgroundImage
+              = stretchToFullPage(backgroundImage, generator.outputContentRect(), generator.outputImageSize());
         }
 
         QDir().mkdir(foregroundDir);
@@ -485,14 +485,13 @@ FilterResultPtr Task::process(const TaskStatus& status, const FilterData& data, 
     // Otherwise it will get constructed on demand.
     despeckleVisualization = despeckleState.visualize();
   }
-  const QRect displayContentRect
-      = stretchCover ? QRect(QPoint(0, 0), outImg.size()) : generator.outputContentRect();
+  const QRect displayContentRect = stretchCover ? QRect(QPoint(0, 0), outImg.size()) : generator.outputContentRect();
   if (m_nextTask) {
     return m_nextTask->process(status, outImg);
   }
-  return std::make_shared<UiUpdater>(m_filter, m_settings, std::move(m_dbg), params, newXform,
-                                     displayContentRect, m_pageId, data.origImage(), outImg, automaskImg,
-                                     despeckleState, despeckleVisualization, m_batchProcessing, m_debug);
+  return std::make_shared<UiUpdater>(m_filter, m_settings, std::move(m_dbg), params, newXform, displayContentRect,
+                                     m_pageId, data.origImage(), outImg, automaskImg, despeckleState,
+                                     despeckleVisualization, m_batchProcessing, m_debug);
 }  // Task::process
 
 /**
@@ -577,7 +576,8 @@ void Task::UiUpdater::updateUI(FilterUiInterface* ui) {
   QObject::connect(optWidget, SIGNAL(resetDewarpingRequested()), dewarpingView.get(), SLOT(resetToNormalGrid()));
   QObject::connect(dewarpingView.get(), SIGNAL(distortionModelChanged(const dewarping::DistortionModel&)), optWidget,
                    SLOT(distortionModelChanged(const dewarping::DistortionModel&)));
-  dewarpingView->livePreviewChanged(optWidget->liveDewarpingPreviewEnabled() && (optWidget->lastTab() == TAB_DEWARPING));
+  dewarpingView->livePreviewChanged(optWidget->liveDewarpingPreviewEnabled()
+                                    && (optWidget->lastTab() == TAB_DEWARPING));
   dewarpingView->simpleManualModeChanged(optWidget->simpleDewarpingModeEnabled());
   tabImageRectMap->insert(
       std::pair<ImageViewTab, QRectF>(TAB_DEWARPING, m_xform.resultingPreCropArea().boundingRect()));

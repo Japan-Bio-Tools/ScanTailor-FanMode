@@ -21,8 +21,12 @@ Dependencies::Dependencies(const QPolygonF& rotatedPageOutline,
                            const bool includeHeaderTitle,
                            const bool includePageNumber)
     : m_rotatedPageOutline(rotatedPageOutline),
-      m_params(contentDetectionMode, pageDetectionMode, fineTuneCorners, accurateContentDetection,
-               includeHeaderTitle, includePageNumber) {}
+      m_params(contentDetectionMode,
+               pageDetectionMode,
+               fineTuneCorners,
+               accurateContentDetection,
+               includeHeaderTitle,
+               includePageNumber) {}
 
 Dependencies::Dependencies(const QDomElement& depsEl)
     : m_rotatedPageOutline(XmlUnmarshaller::polygonF(depsEl.namedItem("rotated-page-outline").toElement())),

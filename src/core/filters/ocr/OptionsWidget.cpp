@@ -78,8 +78,7 @@ OptionsWidget::OptionsWidget(std::shared_ptr<Settings> settings,
 
   connect(arabicCheckBox, &QCheckBox::toggled, this, &OptionsWidget::languagesChanged);
   connect(englishCheckBox, &QCheckBox::toggled, this, &OptionsWidget::languagesChanged);
-  connect(compressionCombo, qOverload<int>(&QComboBox::currentIndexChanged), this,
-          &OptionsWidget::compressionChanged);
+  connect(compressionCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, &OptionsWidget::compressionChanged);
   connect(exportPdfButton, &QPushButton::clicked, this, &OptionsWidget::exportPdf);
 
   syncFromSettings();
@@ -141,9 +140,7 @@ std::vector<PageId> OptionsWidget::orderedPageIds() const {
   const PageId frontCover = outputFilter ? outputFilter->frontCoverPageId() : PageId();
   const PageId backCover = outputFilter ? outputFilter->backCoverPageId() : PageId();
 
-  auto sequenceContains = [&](const PageId& pageId) {
-    return !pageId.isNull() && sequence.pageNo(pageId) >= 0;
-  };
+  auto sequenceContains = [&](const PageId& pageId) { return !pageId.isNull() && sequence.pageNo(pageId) >= 0; };
   if (sequenceContains(frontCover)) {
     pages.push_back(frontCover);
   }
@@ -201,9 +198,8 @@ void OptionsWidget::updateEstimate() {
   const qint64 estimatedBytes
       = qMax<qint64>(files.size() * 4096, qRound64(sourceBytes * m_settings->estimatedSizeRatio()));
   if (hasLanguage) {
-    estimateLabel->setText(tr("Estimated searchable PDF size: about %1 (%2 pages)")
-                               .arg(formatBytes(estimatedBytes))
-                               .arg(files.size()));
+    estimateLabel->setText(
+        tr("Estimated searchable PDF size: about %1 (%2 pages)").arg(formatBytes(estimatedBytes)).arg(files.size()));
   } else {
     estimateLabel->setText(tr("Estimated image-only PDF size: about %1 (%2 pages). No OCR text layer.")
                                .arg(formatBytes(estimatedBytes))
@@ -246,8 +242,8 @@ QString OptionsWidget::suggestedPdfPath(const bool searchable) const {
   if (baseName.isEmpty()) {
     baseName = QStringLiteral("ScanTailor-FanMode");
   }
-  return QDir(directory).filePath(baseName + (searchable ? QStringLiteral("-searchable.pdf")
-                                                        : QStringLiteral("-image-only.pdf")));
+  return QDir(directory).filePath(
+      baseName + (searchable ? QStringLiteral("-searchable.pdf") : QStringLiteral("-image-only.pdf")));
 }
 
 QString OptionsWidget::formatBytes(const qint64 bytes) {
@@ -293,9 +289,9 @@ void OptionsWidget::exportPdf() {
   const QString languages = selectedLanguages();
   const bool searchable = !languages.isEmpty();
 
-  QString targetPath = QFileDialog::getSaveFileName(
-      this, searchable ? tr("Export Searchable PDF") : tr("Export PDF without OCR"),
-      suggestedPdfPath(searchable), tr("PDF documents (*.pdf)"));
+  QString targetPath
+      = QFileDialog::getSaveFileName(this, searchable ? tr("Export Searchable PDF") : tr("Export PDF without OCR"),
+                                     suggestedPdfPath(searchable), tr("PDF documents (*.pdf)"));
   if (targetPath.isEmpty()) {
     return;
   }
@@ -304,8 +300,7 @@ void OptionsWidget::exportPdf() {
   }
 
   if (!searchable) {
-    QTemporaryDir temporaryDirectory(
-        QDir(QDir::tempPath()).filePath(QStringLiteral("ScanTailor-FanMode-PDF-XXXXXX")));
+    QTemporaryDir temporaryDirectory(QDir(QDir::tempPath()).filePath(QStringLiteral("ScanTailor-FanMode-PDF-XXXXXX")));
     if (!temporaryDirectory.isValid()) {
       QMessageBox::warning(this, tr("PDF Export"), tr("Unable to create a temporary PDF folder."));
       return;
@@ -376,8 +371,7 @@ void OptionsWidget::exportPdf() {
     }
   }
 
-  QTemporaryDir temporaryDirectory(
-      QDir(QDir::tempPath()).filePath(QStringLiteral("ScanTailor-FanMode-OCR-XXXXXX")));
+  QTemporaryDir temporaryDirectory(QDir(QDir::tempPath()).filePath(QStringLiteral("ScanTailor-FanMode-OCR-XXXXXX")));
   if (!temporaryDirectory.isValid()) {
     QMessageBox::warning(this, tr("OCR & PDF"), tr("Unable to create a temporary OCR folder."));
     return;
@@ -416,22 +410,11 @@ void OptionsWidget::exportPdf() {
   QProcess process;
   process.setProcessChannelMode(QProcess::MergedChannels);
   process.setProgram(tesseractPath);
-  process.setArguments({QStringLiteral("--tessdata-dir"),
-                        tessdataPath,
-                        imageListPath,
-                        outputBase,
-                        QStringLiteral("-l"),
-                        languages,
-                        QStringLiteral("--oem"),
-                        QStringLiteral("1"),
-                        QStringLiteral("--psm"),
-                        QStringLiteral("3"),
-                        QStringLiteral("-c"),
-                        QStringLiteral("jpg_quality=%1").arg(m_settings->jpegQuality()),
-                        QStringLiteral("-c"),
-                        QStringLiteral("preserve_interword_spaces=1"),
-                        QStringLiteral("pdf"),
-                        QStringLiteral("tsv")});
+  process.setArguments({QStringLiteral("--tessdata-dir"), tessdataPath, imageListPath, outputBase, QStringLiteral("-l"),
+                        languages, QStringLiteral("--oem"), QStringLiteral("1"), QStringLiteral("--psm"),
+                        QStringLiteral("3"), QStringLiteral("-c"),
+                        QStringLiteral("jpg_quality=%1").arg(m_settings->jpegQuality()), QStringLiteral("-c"),
+                        QStringLiteral("preserve_interword_spaces=1"), QStringLiteral("pdf"), QStringLiteral("tsv")});
 
   const int pageCount = static_cast<int>(stagedFiles.size());
   QProgressDialog progress(tr("Recognizing page 1 of %1...").arg(pageCount), tr("Cancel"), 0, pageCount, this);
@@ -493,8 +476,8 @@ void OptionsWidget::exportPdf() {
 
   const QString temporaryPdf = outputBase + QStringLiteral(".pdf");
   const QString temporaryTsv = outputBase + QStringLiteral(".tsv");
-  if ((process.exitStatus() != QProcess::NormalExit) || (process.exitCode() != 0)
-      || !QFileInfo::exists(temporaryPdf) || !QFileInfo::exists(temporaryTsv)) {
+  if ((process.exitStatus() != QProcess::NormalExit) || (process.exitCode() != 0) || !QFileInfo::exists(temporaryPdf)
+      || !QFileInfo::exists(temporaryTsv)) {
     QString details = processOutput.trimmed();
     if (details.size() > 1500) {
       details = details.right(1500);

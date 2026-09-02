@@ -109,8 +109,8 @@ std::vector<QPointF> traceRule(const GrayImage& image,
     for (int y = std::max(rect.top(), predictedY - verticalSearch);
          y <= std::min(rect.bottom(), predictedY + verticalSearch); ++y) {
       int score = 0;
-      for (int xx = std::max(rect.left(), x - horizontalRadius);
-           xx <= std::min(rect.right(), x + horizontalRadius); ++xx) {
+      for (int xx = std::max(rect.left(), x - horizontalRadius); xx <= std::min(rect.right(), x + horizontalRadius);
+           ++xx) {
         uint8_t darkest = 255;
         for (int yy = std::max(rect.top(), y - 1); yy <= std::min(rect.bottom(), y + 1); ++yy) {
           darkest = std::min(darkest, pixel(image, xx, yy));
@@ -154,7 +154,7 @@ std::vector<QPointF> traceRule(const GrayImage& image,
 }  // namespace
 
 TableLineDistortionModelBuilder::Result TableLineDistortionModelBuilder::build(const GrayImage& image,
-                                                                                const QRect& contentRect) {
+                                                                               const QRect& contentRect) {
   Result result;
   const QRect rect = contentRect.intersected(image.rect());
   if (image.isNull() || (rect.width() < 160) || (rect.height() < 160)) {
@@ -204,15 +204,14 @@ TableLineDistortionModelBuilder::Result TableLineDistortionModelBuilder::build(c
   result.candidateLineCount = static_cast<int>(candidates.size());
 
   // Suppress duplicate hypotheses produced by a thick or antialiased rule.
-  std::sort(candidates.begin(), candidates.end(), [](const RuleCandidate& lhs, const RuleCandidate& rhs) {
-    return lhs.score > rhs.score;
-  });
+  std::sort(candidates.begin(), candidates.end(),
+            [](const RuleCandidate& lhs, const RuleCandidate& rhs) { return lhs.score > rhs.score; });
   std::vector<RuleCandidate> unique;
   for (const RuleCandidate& candidate : candidates) {
     bool duplicate = false;
     for (const RuleCandidate& accepted : unique) {
-      const double sharedCenter = 0.5 * (std::max(candidate.left, accepted.left)
-                                         + std::min(candidate.right, accepted.right));
+      const double sharedCenter
+          = 0.5 * (std::max(candidate.left, accepted.left) + std::min(candidate.right, accepted.right));
       if ((overlap(candidate, accepted) > 0.35 * rect.width())
           && (std::abs(yAt(candidate, sharedCenter, centerX) - yAt(accepted, sharedCenter, centerX)) < 8.0)) {
         duplicate = true;
@@ -236,8 +235,8 @@ TableLineDistortionModelBuilder::Result TableLineDistortionModelBuilder::build(c
     for (const RuleCandidate& candidate : unique) {
       const int anchorWidth = anchor.right - anchor.left;
       const int candidateWidth = candidate.right - candidate.left;
-      const double widthRatio = static_cast<double>(std::min(anchorWidth, candidateWidth))
-                                / std::max(anchorWidth, candidateWidth);
+      const double widthRatio
+          = static_cast<double>(std::min(anchorWidth, candidateWidth)) / std::max(anchorWidth, candidateWidth);
       const double overlapRatio = overlap(anchor, candidate) / std::min(anchorWidth, candidateWidth);
       if ((widthRatio >= 0.70) && (overlapRatio >= 0.82)
           && (std::abs(anchor.left - candidate.left) <= 0.13 * rect.width())
@@ -249,10 +248,9 @@ TableLineDistortionModelBuilder::Result TableLineDistortionModelBuilder::build(c
     if (family.empty()) {
       continue;
     }
-    const auto vertical = std::minmax_element(family.begin(), family.end(), [](const RuleCandidate& lhs,
-                                                                               const RuleCandidate& rhs) {
-      return lhs.centerY < rhs.centerY;
-    });
+    const auto vertical = std::minmax_element(
+        family.begin(), family.end(),
+        [](const RuleCandidate& lhs, const RuleCandidate& rhs) { return lhs.centerY < rhs.centerY; });
     const double spread = vertical.second->centerY - vertical.first->centerY;
     const double familyScore = family.size() + spread / rect.height();
     if (familyScore > bestFamilyScore) {
@@ -264,9 +262,8 @@ TableLineDistortionModelBuilder::Result TableLineDistortionModelBuilder::build(c
   if (bestFamily.size() < 3) {
     return result;
   }
-  std::sort(bestFamily.begin(), bestFamily.end(), [](const RuleCandidate& lhs, const RuleCandidate& rhs) {
-    return lhs.centerY < rhs.centerY;
-  });
+  std::sort(bestFamily.begin(), bestFamily.end(),
+            [](const RuleCandidate& lhs, const RuleCandidate& rhs) { return lhs.centerY < rhs.centerY; });
   const RuleCandidate& top = bestFamily.front();
   const RuleCandidate& bottom = bestFamily.back();
   if (bottom.centerY - top.centerY < std::max(30.0, 0.07 * rect.height())) {
