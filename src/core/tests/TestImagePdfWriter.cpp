@@ -62,10 +62,10 @@ BOOST_AUTO_TEST_CASE(creates_multi_page_pdf_without_a_text_layer) {
   std::vector<QPDFPageObjectHelper> pages = QPDFPageDocumentHelper(pdf).getAllPages();
   BOOST_REQUIRE_EQUAL(pages.size(), 2);
 
-  const QPDFObjectHandle firstBox = pages.at(0).getMediaBox();
+  QPDFObjectHandle firstBox = pages.at(0).getMediaBox();
   BOOST_CHECK_SMALL(firstBox.getArrayItem(2).getNumericValue() - 72.0, 0.05);
   BOOST_CHECK_SMALL(firstBox.getArrayItem(3).getNumericValue() - 144.0, 0.05);
-  const QPDFObjectHandle secondBox = pages.at(1).getMediaBox();
+  QPDFObjectHandle secondBox = pages.at(1).getMediaBox();
   BOOST_CHECK_SMALL(secondBox.getArrayItem(2).getNumericValue() - 144.0, 0.05);
   BOOST_CHECK_SMALL(secondBox.getArrayItem(3).getNumericValue() - 72.0, 0.05);
 
@@ -122,7 +122,7 @@ BOOST_AUTO_TEST_CASE(reads_scan_tailor_output_tiff_without_a_qt_tiff_plugin) {
   pdf.processFile(pdfPath.toUtf8().constData());
   std::vector<QPDFPageObjectHelper> pages = QPDFPageDocumentHelper(pdf).getAllPages();
   BOOST_REQUIRE_EQUAL(pages.size(), 1);
-  const QPDFObjectHandle mediaBox = pages.front().getMediaBox();
+  QPDFObjectHandle mediaBox = pages.front().getMediaBox();
   BOOST_CHECK_SMALL(mediaBox.getArrayItem(2).getNumericValue() - 153.6, 0.05);
   BOOST_CHECK_SMALL(mediaBox.getArrayItem(3).getNumericValue() - 216.0, 0.05);
 }
