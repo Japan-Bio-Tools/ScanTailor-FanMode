@@ -1,0 +1,76 @@
+name: Windows portable
+
+on:
+  push:
+    branches: [ci/windows-portable]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  portable:
+    name: Windows x64 Release
+    runs-on: windows-2022
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install MSYS2 UCRT64 dependencies
+        uses: msys2/setup-msys2@v2
+        id: msys2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-qt5-base
+            mingw-w64-ucrt-x86_64-qt5-tools
+            mingw-w64-ucrt-x86_64-qt5-svg
+            mingw-w64-ucrt-x86_64-boost
+            mingw-w64-ucrt-x86_64-libjpeg-turbo
+            mingw-w64-ucrt-x86_64-libpng
+            mingw-w64-ucrt-x86_64-libtiff
+            mingw-w64-ucrt-x86_64-zlib
+            mingw-w64-ucrt-x86_64-poppler
+            mingw-w64-ucrt-x86_64-poppler-data
+            mingw-w64-ucrt-x86_64-tesseract-ocr
+            mingw-w64-ucrt-x86_64-tesseract-data-eng
+            mingw-w64-ucrt-x86_64-tesseract-data-ara
+            mingw-w64-ucrt-x86_64-leptonica
+            mingw-w64-ucrt-x86_64-qpdf
+      - name: Record dependency versions
+        shell: msys2 {0}
+        run: pacman -Q > msys2-packages.txt
+      - name: Release build and all existing tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+          OMP_THREAD_LIMIT: '2'
+        run: ./scripts/build-windows-native.ps1 -Configuration Release -MsysRoot "${{ steps.msys2.outputs.msys2-location }}"
+      - name: Create portable ZIP
+        run: ./scripts/package-windows-native.ps1 -Version 0.1.0-alpha.0 -MsysRoot "${{ steps.msys2.outputs.msys2-location }}"
+      - name: Validate extracted ZIP without MSYS2 on PATH
+        run: ./scripts/test-windows-portable.ps1 -Version 0.1.0-alpha.0
+      - name: Upload verified portable ZIP
+        uses: actions/upload-artifact@v5
+        with:
+          name: ScanTailor-FanMode-0.1.0-alpha.0-win-x64
+          path: artifacts/ScanTailor-FanMode-0.1.0-alpha.0-win-x64.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: windows-build-diagnostics
+          path: |
+            msys2-packages.txt
+            build-fanmode/Testing/Temporary/LastTest.log
+            artifacts/portable-validation.txt
+          if-no-files-found: warn
+          retention-days: 30

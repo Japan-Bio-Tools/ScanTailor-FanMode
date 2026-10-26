@@ -1,7 +1,7 @@
 # Building ScanTailor FanMode on Windows
 
 FanMode's tested native toolchain is 64-bit MSYS2 UCRT with CMake and Ninja. The helper scripts expect MSYS2 under
-`%LOCALAPPDATA%\Programs\MSYS2`; adjust the scripts if your installation is elsewhere.
+`%LOCALAPPDATA%\Programs\MSYS2`; pass `-MsysRoot C:\path\to\msys64` to the scripts if your installation is elsewhere.
 
 ## Prerequisites
 
@@ -54,3 +54,23 @@ The inherited CMake project remains cross-platform, but FanMode's complete PDF/O
 are tested primarily on Windows x64. Linux contributors need equivalent development packages and runtime programs.
 Platform-specific packaging inherited from ScanTailor Advanced may still refer to upstream product names until it
 is fully adapted and tested.
+
+## GitHub Actions：WindowsポータブルZIP
+
+[Windows portable](../../actions/workflows/windows-portable.yml) は `ci/windows-portable` ブランチへのpush、
+またはActions画面の **Run workflow** で実行する。MSYS2 UCRT64／Qt5で既存スクリプトのReleaseビルドと
+全CTestを実行し、既存パッケージング処理でZIPを作成する。インストーラー・Release・タグは作成しない。
+
+ZIPを新しいフォルダーへ展開して、MSYS2をPATHから除いた環境で次を確認してからアップロードする。
+
+- DLLの再帰的な依存解決とx64形式、Qtプラグイン、英語／アラビア語データ、ライセンスの同梱
+- Tesseractによる検索可能PDFの作成、QPDFでの検証、PopplerによるTIFFへの再変換
+- Windowsプラグインを使ったアプリのメインウィンドウ表示
+
+成功した実行の **Artifacts** から `ScanTailor-FanMode-0.1.0-alpha.0-win-x64` をダウンロードする（保存期間30日）。
+Artifactを展開し、中の同名ZIPも展開して `scantailor-fanmode.exe` を起動する。
+DLL・サブフォルダーを含め、展開したフォルダー全体を保持する。MSYS2や開発ツールの手動インストールは不要。
+`windows-build-diagnostics` には依存パッケージ一覧・テストログ・ZIP検証結果を保存する。
+
+CI上の起動確認は、利用者のWindows PCでの起動や日本語縦書き原稿の補正結果を保証しない。
+日本語OCR・指除去機能の追加や、PDF入力・湾曲補正・PDF出力の処理変更は行わない。
