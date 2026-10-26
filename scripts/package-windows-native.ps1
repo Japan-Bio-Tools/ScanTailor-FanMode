@@ -1,5 +1,6 @@
 param(
-    [string]$Version = '0.1.0-alpha.0'
+    [string]$Version = '0.1.0-alpha.0',
+    [string]$MsysRoot = (Join-Path $env:LOCALAPPDATA 'Programs\MSYS2')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -11,7 +12,7 @@ $packageName = "ScanTailor-FanMode-$Version-win-x64"
 $packageDir = Join-Path $artifactsDir $packageName
 $zipPath = Join-Path $artifactsDir "$packageName.zip"
 $executable = Join-Path $buildDir 'scantailor-fanmode.exe'
-$msysRoot = Join-Path $env:LOCALAPPDATA 'Programs\MSYS2'
+$msysRoot = [System.IO.Path]::GetFullPath($MsysRoot)
 $ucrtRoot = Join-Path $msysRoot 'ucrt64'
 $ucrtBin = Join-Path $ucrtRoot 'bin'
 $objdump = Join-Path $ucrtBin 'objdump.exe'
@@ -60,6 +61,16 @@ New-Item -ItemType Directory -Path $resolvedPackage -Force | Out-Null
 Copy-Item -LiteralPath $executable -Destination $resolvedPackage
 Copy-Item -LiteralPath $pdfConverter -Destination $resolvedPackage
 Copy-Item -LiteralPath $ocrEngine -Destination $resolvedPackage
+Copy-Item -LiteralPath (Join-Path $ucrtBin 'qpdf.exe') -Destination $resolvedPackage
+# Deploy Qt plugins even with Qt5 (CMake only runs windeployqt for Qt6).
+$previousPath = $env:Path
+try {
+    $env:Path = $ucrtBin + ';' + $env:Path
+    & (Join-Path $ucrtBin 'windeployqt.exe') --release --no-compiler-runtime --no-system-d3d-compiler --no-opengl-sw (Join-Path $resolvedPackage 'scantailor-fanmode.exe')
+    if ($LASTEXITCODE -ne 0) { throw 'Qt deployment failed.' }
+} finally {
+    $env:Path = $previousPath
+}
 Copy-Item -LiteralPath $tessdata -Destination $resolvedPackage -Recurse
 Get-ChildItem -LiteralPath $buildDir -Filter '*.dll' -File | Copy-Item -Destination $resolvedPackage
 Get-ChildItem -LiteralPath $buildDir -Filter 'scantailor-advanced_*.qm' -File |
@@ -90,6 +101,8 @@ if (Test-Path -LiteralPath $qpdfLicenses) {
     Copy-Item -LiteralPath $qpdfLicenses -Destination $thirdPartyLicenses -Recurse
 }
 
+Copy-Item -Path (Join-Path $ucrtRoot 'share\licenses\*') -Destination $thirdPartyLicenses -Recurse -Force
+
 # Copy every non-system MinGW dependency, including dependencies of plugins.
 $queue = [System.Collections.Generic.Queue[string]]::new()
 Get-ChildItem -LiteralPath $resolvedPackage -Recurse -File |
@@ -103,7 +116,10 @@ while ($queue.Count -gt 0) {
         continue
     }
 
-    $imports = & $objdump -p $binary 2>$null |
+    $dump = & $objdump -p $binary
+    if ($LASTEXITCODE -ne 0) { throw "Cannot inspect binary: $binary" }
+    if (-not ($dump -match 'file format pei-x86-64')) { throw "Not an x64 PE binary: $binary" }
+    $imports = $dump |
         Select-String -Pattern '^\s*DLL Name:\s*(.+)$' |
         ForEach-Object { $_.Matches[0].Groups[1].Value.Trim() } |
         Sort-Object -Unique
@@ -118,6 +134,9 @@ while ($queue.Count -gt 0) {
         if (Test-Path -LiteralPath $toolchainDependency) {
             Copy-Item -LiteralPath $toolchainDependency -Destination $packagedDependency
             $queue.Enqueue($packagedDependency)
+        } elseif ($import -notmatch '^(api-ms-win-|ext-ms-win-)' -and
+                  -not (Test-Path -LiteralPath (Join-Path $env:SystemRoot "System32\$import"))) {
+            throw "Unresolved DLL dependency '$import' required by '$binary'"
         }
     }
 }
